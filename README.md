@@ -1,158 +1,108 @@
 # AI Inventory Optimization System
 
-A multi-agent AI-powered inventory optimization system that provides demand forecasting, inventory management, and pricing recommendations.
+An AI-powered inventory optimization platform that uses advanced multi-agent architecture to deliver intelligent demand forecasting, dynamic inventory management, and data-driven pricing strategies.
 
 ## Overview
 
-This system uses a multi-agent architecture to optimize inventory management:
+The AI Inventory Optimization System is a comprehensive solution designed to help businesses optimize their inventory operations using artificial intelligence. By leveraging multiple specialized AI agents working together, the system provides accurate demand forecasting, optimal inventory management, and smart pricing recommendations.
 
-1. **Demand Agent**: Forecasts future product demand based on historical data
-2. **Inventory Agent**: Makes inventory level recommendations based on demand predictions
-3. **Pricing Agent**: Suggests optimal pricing strategies based on demand and inventory levels
+## Key Features
 
-## Features
+- **Demand Forecasting**: Advanced algorithms predict future demand based on historical data, seasonality, trends, and external factors.
+- **Inventory Management**: Optimize inventory levels to minimize carrying costs while preventing stockouts and overstock situations.
+- **Pricing Optimization**: Set the right prices based on demand elasticity, competitor pricing, and inventory levels to maximize revenue.
+- **Multi-Agent Architecture**: Specialized AI agents collaborate to deliver coordinated recommendations that optimize your entire inventory system.
+- **Web Scraper Integration**: Collect market data such as competitor prices, product information, and industry trends.
+- **LLM Integration**: Leverage large language models for recommendation generation and complex analysis.
 
-- AI-powered demand forecasting
-- Inventory level optimization recommendations
-- Dynamic pricing strategy suggestions
-- Web dashboard for monitoring agent activities and recommendations
-- Detailed logging of all agent actions
-- Web scraping capability for market intelligence
+## Technology Stack
 
-## Technical Stack
+- **Backend**: Python, Flask, SQLAlchemy
+- **Database**: PostgreSQL 
+- **AI Components**: NumPy, pandas, scikit-learn, Trafilatura
+- **Frontend**: Bootstrap 5, JavaScript
+- **Deployment**: Gunicorn, Docker (optional)
 
-- **Backend**: Python/Flask
-- **Database**: PostgreSQL with SQLAlchemy ORM
-- **Frontend**: HTML, Bootstrap CSS, Chart.js
-- **AI Models**: Custom forecasting models with LLM integration
-- **Utilities**: Web scraping, API integrations, and data processing
-
-## System Setup and Installation
+## Installation
 
 ### Prerequisites
+
 - Python 3.9+
 - PostgreSQL database
-- pip for package management
+- Pip package manager
 
-### Installation Steps
-1. Clone this repository
+### Setup
+
+1. Clone the repository:
    ```bash
-   git clone https://github.com/Rupinpatel75/ai-inventory-optimization.git
+   git clone https://github.com/yourusername/ai-inventory-optimization.git
    cd ai-inventory-optimization
    ```
 
-2. Install dependencies
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Set up environment variables
+3. Configure environment variables:
    ```bash
-   # Database connection (required)
    export DATABASE_URL=postgresql://username:password@localhost:5432/inventory_db
-   
-   # Optional variables
-   export SESSION_SECRET=your_session_secret_key
-   export FLASK_DEBUG=1  # For development only
+   export FLASK_SECRET_KEY=your_secret_key
    ```
 
-4. Initialize the database
+4. Initialize the database:
    ```bash
-   # The app will automatically create tables and sample data on first run
-   # Make sure PostgreSQL is running and the database exists
+   python -c "from app import app, db; app.app_context().push(); db.create_all()"
    ```
 
-5. Run the application
+5. Run the application:
    ```bash
-   python main.py
+   gunicorn --bind 0.0.0.0:5000 --reload main:app
    ```
 
-6. Access the web interface
-   - Main page: http://localhost:5000/
-   - Dashboard: http://localhost:5000/dashboard
-   - Agent logs: http://localhost:5000/logs
+6. Access the application at http://localhost:5000
 
-## API Usage Guide
+## Usage
 
-The system provides several API endpoints to interact with the AI agents programmatically.
+### Demand Forecasting
 
-### Generate Demand Predictions
+Use the demand forecasting agent to predict future demand for your products across different stores:
 
-**Endpoint:** `POST /api/predict`
+1. Navigate to the Products page
+2. Select a product
+3. Click on "Generate Forecast"
+4. View the forecasted demand and confidence level
 
-**Body:**
-```json
-{
-  "product_id": 1,
-  "store_id": 1,
-  "days": 30
-}
-```
+### Inventory Optimization
 
-**Example (using curl):**
-```bash
-curl -X POST http://localhost:5000/api/predict \
-  -H "Content-Type: application/json" \
-  -d '{"product_id": 1, "store_id": 1, "days": 30}'
-```
+Optimize your inventory levels to minimize costs:
 
-**Response:**
-```json
-{
-  "success": true,
-  "predictions": [
-    {"date": "2025-04-05", "demand": 15},
-    {"date": "2025-04-06", "demand": 18},
-    ...
-  ],
-  "inventory_recommendation": {
-    "status": "ADEQUATE",
-    "current_quantity": 50,
-    "recommended_order": 30,
-    "reasoning": "Current stock will cover approximately 10 days..."
-  },
-  "pricing_recommendation": {
-    "strategy": "STANDARD",
-    "base_price": 599.99,
-    "recommended_price": 629.99,
-    "explanation": "Demand is consistent with slight increase trend..."
-  }
-}
-```
+1. Navigate to the Inventory page
+2. Select a product or store
+3. Click on "Optimize Inventory"
+4. Review the recommended inventory levels and reorder points
 
-### Get Inventory Data
+### Pricing Optimization
 
-**Endpoint:** `GET /api/inventory?product_id=1&store_id=1`
+Set optimal prices based on market conditions:
 
-**Example:**
-```bash
-curl http://localhost:5000/api/inventory?product_id=1&store_id=1
-```
-
-### Get Agent Logs
-
-**Endpoint:** `GET /api/logs?agent_type=demand&limit=10`
-
-**Example:**
-```bash
-curl http://localhost:5000/api/logs?agent_type=demand&limit=10
-```
-
-### Test Web Scraper
-
-**Endpoint:** `POST /api/web-scraper-test`
-
-**Body:**
-```json
-{
-  "url": "https://example.com/product-page"
-}
-```
-
-## Integration with External Systems
-
-The system can be integrated with ERP systems, e-commerce platforms, or POS systems via the APIs detailed above. Use the prediction endpoint to regularly update your inventory management system with AI-optimized recommendations.
+1. Navigate to the Products page
+2. Select a product
+3. Click on "Optimize Pricing"
+4. Review the recommended pricing strategies and expected impact
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Contributors
+
+- Your Name (@YourGitHubUsername)
+
+## Acknowledgements
+
+- [Bootstrap](https://getbootstrap.com/)
+- [Flask](https://flask.palletsprojects.com/)
+- [SQLAlchemy](https://www.sqlalchemy.org/)
+- [scikit-learn](https://scikit-learn.org/)
+- [Trafilatura](https://github.com/adbar/trafilatura)

@@ -1,360 +1,447 @@
-import logging
-import json
-import random
-from typing import Dict, List, Any, Optional
-from datetime import datetime
+"""
+Pricing Agent module for the AI Inventory Optimization System.
 
+This module provides the pricing optimization agent that suggests
+optimal prices based on market data, competitor prices, and demand elasticity.
+"""
+
+import logging
 from agents.base_agent import BaseAgent
-from models import Product, InventoryRecord
-from app import db
+from utils.price_optimizer import calculate_optimal_price, get_pricing_recommendation, calculate_promotion_impact
+from utils.web_scraper import WebScraper
+from models import Product, Store, db
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 class PricingAgent(BaseAgent):
     """
-    Agent responsible for determining optimal pricing strategies
-    based on demand predictions and inventory levels.
+    Pricing optimization agent that suggests optimal prices
+    based on market data, competitor prices, and demand elasticity.
     """
     
     def __init__(self):
-        super().__init__("Pricing Agent", "pricing")
-        logger.info("Pricing Agent initialized")
+        """Initialize the pricing agent."""
+        super().__init__(agent_type="pricing")
+        self.scraper = WebScraper()
     
-    def optimize_price(self, product_id, store_id, demand_predictions):
+    def get_optimal_price(self, product_id, store_id):
         """
-        Determine optimal pricing strategy based on demand predictions and inventory.
+        Calculate the optimal price for a product at a store.
         
         Args:
             product_id: ID of the product
             store_id: ID of the store
-            demand_predictions: List of dictionaries with date and predicted demand
             
         Returns:
-            Dictionary with pricing recommendations
+            Dictionary with optimal price and parameters
         """
         try:
-            # Log action start
-            self.log_action(
-                action="optimize_price_start",
-                product_id=product_id,
-                store_id=store_id,
-                details={
-                    "prediction_count": len(demand_predictions) if demand_predictions else 0
-                }
-            )
+            # Get product and store to check if they exist
+            product = self.get_product(product_id)
+            store = self.get_store(store_id)
             
-            # Get product details
-            product = Product.query.get(product_id)
-            if not product:
-                logger.warning(f"Product not found with ID: {product_id}")
+            if not product or not store:
+                logger.error(f"Product {product_id} or store {store_id} not found")
                 return {
-                    "error": "Product not found",
-                    "recommendation": "Unable to make pricing recommendation"
+                    "error": f"Product {product_id} or store {store_id} not found"
                 }
             
-            # Get current inventory level
-            inventory_record = InventoryRecord.query.filter_by(
+            # Use current base price as starting point
+            current_price = product.base_price
+            
+            # Calculate optimal price
+            optimal = calculate_optimal_price(product_id, store_id, current_price)
+            
+            # Log the agent action
+            self.log_action(
+                action="Optimal price calculation",
                 product_id=product_id,
-                store_id=store_id
-            ).first()
+                store_id=store_id,
+                details=optimal
+            )
             
-            current_inventory = inventory_record.quantity if inventory_record else 0
-            
-            # Calculate total predicted demand
-            total_predicted_demand = sum(p.get('demand', 0) for p in demand_predictions)
-            avg_daily_demand = total_predicted_demand / len(demand_predictions) if demand_predictions else 0
-            
-            # Get base price from product
-            base_price = product.base_price
-            
-            # Basic pricing logic - adjust based on inventory vs. demand
-            inventory_demand_ratio = current_inventory / max(1, avg_daily_demand * 7)  # Inventory vs. 7-day demand
-            
-            # Default pricing strategy
-            if inventory_demand_ratio <= 0.5:  # Low inventory compared to demand
-                strategy = "PREMIUM"
-                price_adjustment = 1.15  # 15% markup
-                explanation = "Low inventory relative to demand suggests premium pricing to maximize margin."
-            elif inventory_demand_ratio <= 1.0:  # Balanced inventory and demand
-                strategy = "STANDARD"
-                price_adjustment = 1.0  # Standard price
-                explanation = "Balanced inventory and demand indicate maintaining standard pricing."
-            elif inventory_demand_ratio <= 2.0:  # Moderate excess inventory
-                strategy = "DISCOUNT"
-                price_adjustment = 0.9  # 10% discount
-                explanation = "Moderate excess inventory suggests a small discount to increase sales velocity."
-            else:  # Significant excess inventory
-                strategy = "CLEARANCE"
-                price_adjustment = 0.75  # 25% discount
-                explanation = "Significant excess inventory indicates need for clearance pricing to reduce stock."
-            
-            # Calculate recommended price
-            recommended_price = round(base_price * price_adjustment, 2)
-            
-            # Use LLM for enhanced pricing strategy if available
-            if self.llm and self.llm.check_ollama_available():
-                logger.info("Using LLM to enhance pricing recommendations")
-                
-                # Get additional market data if available
-                market_data = self._get_market_data(product)
-                
-                # Create context for LLM
-                context = {
-                    "product": {
-                        "id": product.id,
-                        "name": product.name,
-                        "category": product.category,
-                        "base_price": product.base_price
-                    },
-                    "inventory": {
-                        "current_quantity": current_inventory,
-                        "inventory_demand_ratio": inventory_demand_ratio
-                    },
-                    "demand": {
-                        "average_daily": avg_daily_demand,
-                        "total_predicted": total_predicted_demand,
-                        "days_forecasted": len(demand_predictions)
-                    },
-                    "pricing": {
-                        "base_price": base_price,
-                        "preliminary_strategy": strategy,
-                        "preliminary_price_adjustment": price_adjustment,
-                        "preliminary_recommended_price": recommended_price
-                    },
-                    "market_data": market_data
-                }
-                
-                # Prompt for LLM
-                prompt = f"""
-                Analyze optimal pricing strategy for product "{product.name}" with base price ${base_price}.
-                
-                Based on the provided context:
-                1. Evaluate if our preliminary pricing strategy is appropriate
-                2. Suggest an optimal price point considering inventory levels and demand
-                3. Recommend specific pricing actions (increase, maintain, discount)
-                4. Consider competitor pricing and market position if data available
-                
-                Return your analysis as a JSON object with these keys:
-                - "strategy": Overall pricing strategy (e.g., PREMIUM, STANDARD, DISCOUNT, CLEARANCE)
-                - "recommended_price": Specific price point recommendation (number)
-                - "price_adjustment": Multiplier applied to base price (e.g., 0.9 for 10% discount)
-                - "rationale": Brief explanation of your recommendation
-                - "actions": Array of specific actions to take
-                - "expected_impact": Anticipated effect on sales and revenue
-                
-                ONLY return the JSON object, nothing else.
-                """
-                
-                llm_response = self.analyze_with_llm(
-                    prompt=prompt,
-                    context=context,
-                    system_prompt="You are a pricing optimization expert. Provide data-driven pricing recommendations."
-                )
-                
-                # Parse JSON from LLM response
-                try:
-                    # Extract JSON object if embedded in other text
-                    import re
-                    json_match = re.search(r'\{.*\}', llm_response, re.DOTALL)
-                    if json_match:
-                        llm_json = json_match.group(0)
-                        enhanced_pricing = json.loads(llm_json)
-                        
-                        # Update from LLM recommendations if valid
-                        if 'recommended_price' in enhanced_pricing:
-                            try:
-                                llm_price = float(enhanced_pricing['recommended_price'])
-                                # Only accept if within reasonable range (50-200% of base price)
-                                if 0.5 * base_price <= llm_price <= 2.0 * base_price:
-                                    recommended_price = llm_price
-                                    price_adjustment = round(llm_price / base_price, 2)
-                            except (ValueError, TypeError):
-                                pass
-                                
-                        if 'strategy' in enhanced_pricing:
-                            strategy = enhanced_pricing['strategy']
-                            
-                        if 'rationale' in enhanced_pricing:
-                            explanation = enhanced_pricing['rationale']
-                    else:
-                        # Try to parse the whole response as JSON
-                        enhanced_pricing = json.loads(llm_response)
-                except Exception as e:
-                    logger.error(f"Failed to parse LLM pricing JSON: {str(e)}")
-                    enhanced_pricing = {}
-            else:
-                enhanced_pricing = {}
-            
-            # Build final recommendation
-            recommendation = {
+            # Add product and store names
+            result = {
                 "product_id": product_id,
+                "product_name": product.name,
                 "store_id": store_id,
-                "base_price": base_price,
-                "recommended_price": recommended_price,
-                "price_adjustment": price_adjustment,
-                "strategy": strategy,
-                "explanation": explanation,
-                "timestamp": datetime.now().isoformat()
+                "store_name": store.name,
+                **optimal
             }
             
-            # Add additional fields from LLM if available
-            if "actions" in enhanced_pricing:
-                recommendation["actions"] = enhanced_pricing["actions"]
-                
-            if "expected_impact" in enhanced_pricing:
-                recommendation["expected_impact"] = enhanced_pricing["expected_impact"]
-            
-            # Log action completion
-            self.log_action(
-                action="optimize_price_complete",
-                product_id=product_id,
-                store_id=store_id,
-                details={
-                    "strategy": strategy,
-                    "recommended_price": recommended_price,
-                    "price_adjustment": price_adjustment
-                }
-            )
-            
-            return recommendation
-            
+            return result
+        
         except Exception as e:
-            logger.error(f"Error in price optimization: {str(e)}")
-            self.log_action(
-                action="optimize_price_error",
-                product_id=product_id,
-                store_id=store_id,
-                details={
-                    "error": str(e)
-                }
-            )
+            logger.error(f"Error calculating optimal price: {str(e)}")
             return {
-                "error": str(e),
-                "recommendation": "Error occurred during price optimization"
+                "error": f"Failed to calculate optimal price: {str(e)}"
             }
     
-    def apply_price_change(self, product_id, store_id, new_price):
+    def get_price_recommendation(self, product_id, store_id):
         """
-        Apply a price change to a product at a specific store.
-        This would be used to implement pricing decisions.
-        
-        In a real system, this might update a pricing database or POS system.
-        In this demo, it just logs the action.
+        Get a pricing recommendation for a product at a store.
         
         Args:
             product_id: ID of the product
             store_id: ID of the store
-            new_price: New price to apply
             
         Returns:
-            Boolean indicating success
+            Dictionary with pricing recommendation
         """
         try:
-            # Get product details
-            product = Product.query.get(product_id)
-            if not product:
-                logger.warning(f"Product not found with ID: {product_id}")
-                return False
+            # Get product and store to check if they exist
+            product = self.get_product(product_id)
+            store = self.get_store(store_id)
             
-            # Calculate price adjustment
-            price_adjustment = round(new_price / product.base_price, 2)
+            if not product or not store:
+                logger.error(f"Product {product_id} or store {store_id} not found")
+                return {
+                    "error": f"Product {product_id} or store {store_id} not found"
+                }
             
-            # Log action
+            # Use current base price as starting point
+            current_price = product.base_price
+            
+            # Get pricing recommendation
+            recommendation = get_pricing_recommendation(product_id, store_id, current_price)
+            
+            # Log the agent action
             self.log_action(
-                action="apply_price_change",
+                action="Price recommendation",
                 product_id=product_id,
                 store_id=store_id,
-                details={
-                    "base_price": product.base_price,
-                    "new_price": new_price,
-                    "price_adjustment": price_adjustment
-                }
+                details=recommendation
             )
             
-            # In a real system, this would update a pricing database
-            # For now, we'll just return success
-            return True
+            # Add product and store names
+            result = {
+                "product_id": product_id,
+                "product_name": product.name,
+                "store_id": store_id,
+                "store_name": store.name,
+                **recommendation
+            }
             
-        except Exception as e:
-            logger.error(f"Error applying price change: {str(e)}")
-            self.log_action(
-                action="apply_price_change_error",
-                product_id=product_id,
-                store_id=store_id,
-                details={
-                    "error": str(e),
-                    "attempted_price": new_price
-                }
-            )
-            return False
-    
-    def _get_market_data(self, product):
-        """
-        Get market data for a product to inform pricing decisions.
+            return result
         
-        This would typically involve fetching competitor pricing, market trends, etc.
-        In this demo, we'll return simulated data or use the web scraper to get real data.
+        except Exception as e:
+            logger.error(f"Error getting price recommendation: {str(e)}")
+            return {
+                "error": f"Failed to get price recommendation: {str(e)}"
+            }
+    
+    def analyze_promotion(self, product_id, store_id, discount_pct=0.1):
+        """
+        Analyze the impact of a price promotion on demand and profit.
         
         Args:
-            product: Product object
+            product_id: ID of the product
+            store_id: ID of the store
+            discount_pct: Discount percentage (0-1)
             
         Returns:
-            Dictionary with market data
+            Dictionary with promotion impact assessment
         """
-        market_data = {
-            "average_market_price": None,
-            "price_range": None,
-            "competitor_prices": [],
-            "market_trends": [],
-            "source": "simulated"
-        }
+        try:
+            # Get product and store to check if they exist
+            product = self.get_product(product_id)
+            store = self.get_store(store_id)
+            
+            if not product or not store:
+                logger.error(f"Product {product_id} or store {store_id} not found")
+                return {
+                    "error": f"Product {product_id} or store {store_id} not found"
+                }
+            
+            # Ensure discount is in proper format (0-1)
+            if discount_pct > 1:
+                discount_pct = discount_pct / 100  # Convert from percentage to decimal
+            
+            # Use current base price as starting point
+            current_price = product.base_price
+            
+            # Calculate promotion impact
+            impact = calculate_promotion_impact(product_id, store_id, current_price, discount_pct)
+            
+            # Log the agent action
+            self.log_action(
+                action="Promotion analysis",
+                product_id=product_id,
+                store_id=store_id,
+                details=impact
+            )
+            
+            # Add product and store names
+            result = {
+                "product_id": product_id,
+                "product_name": product.name,
+                "store_id": store_id,
+                "store_name": store.name,
+                **impact
+            }
+            
+            return result
         
-        # Try to use web scraper to get real market data
-        if self.scraper:
-            try:
-                # Construct search query for product
-                search_term = f"{product.name} {product.category} price"
+        except Exception as e:
+            logger.error(f"Error analyzing promotion: {str(e)}")
+            return {
+                "error": f"Failed to analyze promotion: {str(e)}"
+            }
+    
+    def get_competitor_prices(self, product_id, store_id):
+        """
+        Get competitor prices for a product.
+        
+        Args:
+            product_id: ID of the product
+            store_id: ID of the store
+            
+        Returns:
+            Dictionary with competitor prices
+        """
+        try:
+            # Get product and store to check if they exist
+            product = self.get_product(product_id)
+            store = self.get_store(store_id)
+            
+            if not product or not store:
+                logger.error(f"Product {product_id} or store {store_id} not found")
+                return {
+                    "error": f"Product {product_id} or store {store_id} not found"
+                }
+            
+            # Get competitor prices using the web scraper
+            competitor_prices = self.scraper.get_competitor_prices(product.name, product.category)
+            
+            # Calculate statistics
+            if competitor_prices:
+                prices = [cp["price"] for cp in competitor_prices]
+                avg_price = sum(prices) / len(prices)
+                min_price = min(prices)
+                max_price = max(prices)
                 
-                # We could scrape e-commerce sites or price comparison sites
-                # For demo purposes, we'll just log the attempt
-                logger.info(f"Would search for market data with query: {search_term}")
+                # Calculate how our price compares
+                our_price = product.base_price
+                relative_position = (our_price - min_price) / (max_price - min_price) if max_price > min_price else 0.5
+                relative_position = round(relative_position * 100)  # Convert to percentage
                 
-                # In a real system, this might call an e-commerce API or scrape sites
-                # For now, we'll use simulated data
-            except Exception as e:
-                logger.error(f"Error fetching market data: {str(e)}")
+                # Count how many competitors have lower/higher prices
+                lower_count = sum(1 for p in prices if p < our_price)
+                higher_count = sum(1 for p in prices if p > our_price)
+                equal_count = sum(1 for p in prices if p == our_price)
+                
+                stats = {
+                    "avg_price": round(avg_price, 2),
+                    "min_price": round(min_price, 2),
+                    "max_price": round(max_price, 2),
+                    "our_price": round(our_price, 2),
+                    "relative_position": f"{relative_position}%",  # e.g. "75%" means we're 75% of the way from min to max
+                    "lower_count": lower_count,
+                    "higher_count": higher_count,
+                    "equal_count": equal_count,
+                    "competitors_count": len(competitor_prices)
+                }
+            else:
+                stats = {
+                    "our_price": round(product.base_price, 2),
+                    "competitors_count": 0
+                }
+            
+            # Log the agent action
+            self.log_action(
+                action="Competitor price analysis",
+                product_id=product_id,
+                store_id=store_id,
+                details={
+                    "competitor_count": len(competitor_prices),
+                    "stats": stats,
+                    "sample": competitor_prices[:3] if competitor_prices else []
+                }
+            )
+            
+            return {
+                "product_id": product_id,
+                "product_name": product.name,
+                "store_id": store_id,
+                "store_name": store.name,
+                "competitor_prices": competitor_prices,
+                "stats": stats
+            }
         
-        # Simulate market data based on product info
-        base_price = product.base_price
+        except Exception as e:
+            logger.error(f"Error getting competitor prices: {str(e)}")
+            return {
+                "error": f"Failed to get competitor prices: {str(e)}"
+            }
+    
+    def update_base_price(self, product_id, new_price):
+        """
+        Update the base price of a product.
         
-        # Simulate average market price (±15% of base price)
-        avg_market_price = round(base_price * random.uniform(0.85, 1.15), 2)
+        Args:
+            product_id: ID of the product
+            new_price: New base price
+            
+        Returns:
+            Dictionary with update result
+        """
+        try:
+            # Get product to check if it exists
+            product = self.get_product(product_id)
+            
+            if not product:
+                logger.error(f"Product {product_id} not found")
+                return {
+                    "error": f"Product {product_id} not found"
+                }
+            
+            # Save old price for logging
+            old_price = product.base_price
+            
+            # Update price
+            product.base_price = new_price
+            db.session.commit()
+            
+            # Log the agent action
+            details = {
+                "old_price": round(old_price, 2),
+                "new_price": round(new_price, 2),
+                "change": round(new_price - old_price, 2),
+                "change_pct": round((new_price - old_price) / old_price * 100, 1) if old_price > 0 else 0
+            }
+            
+            self.log_action(
+                action="Base price update",
+                product_id=product_id,
+                details=details
+            )
+            
+            return {
+                "product_id": product_id,
+                "product_name": product.name,
+                "old_price": round(old_price, 2),
+                "new_price": round(new_price, 2),
+                "change": round(new_price - old_price, 2),
+                "change_pct": f"{details['change_pct']}%",
+                "success": True
+            }
         
-        # Simulate price range
-        price_range = {
-            "min": round(base_price * 0.7, 2),
-            "max": round(base_price * 1.3, 2)
-        }
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error updating base price: {str(e)}")
+            return {
+                "error": f"Failed to update base price: {str(e)}",
+                "success": False
+            }
+    
+    def explain_recommendation(self, product_id, store_id):
+        """
+        Generate a natural language explanation of pricing recommendations.
         
-        # Simulate competitor prices
-        competitor_prices = [
-            {"name": "Competitor A", "price": round(base_price * random.uniform(0.9, 1.1), 2)},
-            {"name": "Competitor B", "price": round(base_price * random.uniform(0.85, 1.2), 2)},
-            {"name": "Competitor C", "price": round(base_price * random.uniform(0.8, 1.3), 2)}
-        ]
+        Args:
+            product_id: ID of the product
+            store_id: ID of the store
+            
+        Returns:
+            Dictionary with recommendation and explanation
+        """
+        try:
+            # Get product and store
+            product = self.get_product(product_id)
+            store = self.get_store(store_id)
+            
+            if not product or not store:
+                logger.error(f"Product {product_id} or store {store_id} not found")
+                return {
+                    "error": f"Product {product_id} or store {store_id} not found"
+                }
+            
+            # Get price recommendation
+            recommendation = self.get_price_recommendation(product_id, store_id)
+            if "error" in recommendation:
+                return recommendation
+            
+            # Get competitor prices (if possible)
+            competitor_data = self.get_competitor_prices(product_id, store_id)
+            
+            # Generate explanation using LLM if available
+            prompt = f"""
+            Please provide a brief explanation of the pricing recommendation for {product.name} at {store.name}.
+            
+            Product: {product.name}
+            Category: {product.category}
+            Current price: ${product.base_price:.2f}
+            
+            Recommendation:
+            - Recommended price: ${recommendation.get('recommended_price', 0):.2f}
+            - Price change: ${recommendation.get('price_change', 0):.2f} ({recommendation.get('price_change_pct', 0)}%)
+            - Action: {recommendation.get('action', 'Unknown')}
+            - Expected profit impact: ${recommendation.get('expected_profit_impact', 0):.2f} ({recommendation.get('expected_profit_impact_pct', 0)}%)
+            - Confidence: {recommendation.get('confidence', 'medium')}
+            
+            """
+            
+            if 'stats' in competitor_data:
+                stats = competitor_data.get('stats', {})
+                prompt += f"""
+                Competitor Analysis:
+                - Average competitor price: ${stats.get('avg_price', 0):.2f}
+                - Range: ${stats.get('min_price', 0):.2f} to ${stats.get('max_price', 0):.2f}
+                - Competitors with lower prices: {stats.get('lower_count', 0)}
+                - Competitors with higher prices: {stats.get('higher_count', 0)}
+                - Our relative position: {stats.get('relative_position', '50%')}
+                """
+            
+            prompt += """
+            Please provide a 3-4 sentence explanation of this recommendation in plain language, 
+            focusing on actionable insights for the store manager.
+            Explain why this price is recommended and what impact it will have on profit and competitive position.
+            """
+            
+            system_prompt = """
+            You are a helpful AI assistant explaining pricing recommendations to a store manager.
+            Your explanation should be clear, concise, and focused on actionable insights.
+            Use plain language and avoid technical terms unless necessary.
+            """
+            
+            explanation = self.analyze_with_llm(prompt, system_prompt)
+            
+            if not explanation or "error" in explanation.lower():
+                # Generate a basic explanation if LLM fails
+                if recommendation.get('recommendation_type') == 'increase':
+                    explanation = f"Recommend increasing the price of {product.name} from ${product.base_price:.2f} to ${recommendation.get('recommended_price', 0):.2f}. "
+                    explanation += f"This represents a {recommendation.get('price_change_pct', 0)}% increase. "
+                    explanation += f"Expected profit impact: ${recommendation.get('expected_profit_impact', 0):.2f} ({recommendation.get('expected_profit_impact_pct', 0)}%)."
+                elif recommendation.get('recommendation_type') == 'decrease':
+                    explanation = f"Recommend decreasing the price of {product.name} from ${product.base_price:.2f} to ${recommendation.get('recommended_price', 0):.2f}. "
+                    explanation += f"This represents a {abs(recommendation.get('price_change_pct', 0))}% decrease. "
+                    explanation += f"Expected profit impact: ${recommendation.get('expected_profit_impact', 0):.2f} ({recommendation.get('expected_profit_impact_pct', 0)}%)."
+                else:
+                    explanation = f"Recommend maintaining the current price of ${product.base_price:.2f} for {product.name}. "
+                    explanation += f"This price is already optimal based on market conditions and demand elasticity."
+            
+            # Log the agent action
+            self.log_action(
+                action="Price recommendation explanation",
+                product_id=product_id,
+                store_id=store_id,
+                details={"explanation": explanation}
+            )
+            
+            return {
+                "product_id": product_id,
+                "product_name": product.name,
+                "store_id": store_id,
+                "store_name": store.name,
+                "current_price": round(product.base_price, 2),
+                "recommendation": recommendation,
+                "competitor_data": competitor_data if 'error' not in competitor_data else None,
+                "explanation": explanation
+            }
         
-        # Simulate market trends
-        market_trends = [
-            {"trend": "Seasonal demand increase" if random.random() > 0.5 else "Seasonal demand decrease"},
-            {"trend": "Price competition increasing" if random.random() > 0.5 else "Market prices stabilizing"}
-        ]
-        
-        # Update market data
-        market_data.update({
-            "average_market_price": avg_market_price,
-            "price_range": price_range,
-            "competitor_prices": competitor_prices,
-            "market_trends": market_trends
-        })
-        
-        return market_data
+        except Exception as e:
+            logger.error(f"Error explaining recommendation: {str(e)}")
+            return {
+                "error": f"Failed to explain recommendation: {str(e)}"
+            }

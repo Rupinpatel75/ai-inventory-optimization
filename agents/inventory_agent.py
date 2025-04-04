@@ -1,301 +1,430 @@
-import logging
-import json
-from typing import Dict, List, Any, Optional
-from datetime import datetime
+"""
+Inventory Agent module for the AI Inventory Optimization System.
 
+This module provides the inventory management agent that optimizes
+inventory levels based on demand forecasts and business constraints.
+"""
+
+import logging
 from agents.base_agent import BaseAgent
-from models import InventoryRecord, Product, Store
-from app import db
+from utils.inventory_optimizer import calculate_optimal_inventory, get_reorder_recommendation, calculate_stockout_risk
+from utils.forecasting import predict_demand
+from models import InventoryRecord, db
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 class InventoryAgent(BaseAgent):
     """
-    Agent responsible for making inventory optimization recommendations
-    based on demand predictions and current inventory levels.
+    Inventory management agent that optimizes inventory levels
+    based on demand forecasts and business constraints.
     """
     
     def __init__(self):
-        super().__init__("Inventory Agent", "inventory")
-        logger.info("Inventory Agent initialized")
+        """Initialize the inventory agent."""
+        super().__init__(agent_type="inventory")
     
-    def optimize_inventory(self, product_id, store_id, demand_predictions):
+    def get_current_inventory(self, product_id, store_id):
         """
-        Make inventory optimization recommendations based on demand predictions.
+        Get current inventory level for a product at a store.
         
         Args:
             product_id: ID of the product
             store_id: ID of the store
-            demand_predictions: List of dictionaries with date and predicted demand
             
         Returns:
-            Dictionary with inventory recommendations
+            Dictionary with inventory details
         """
         try:
-            # Log action start
-            self.log_action(
-                action="optimize_inventory_start",
-                product_id=product_id,
-                store_id=store_id,
-                details={
-                    "prediction_count": len(demand_predictions) if demand_predictions else 0
-                }
-            )
-            
-            # Get current inventory level
-            inventory_record = InventoryRecord.query.filter_by(
-                product_id=product_id,
-                store_id=store_id
-            ).first()
-            
-            if not inventory_record:
-                logger.warning(f"No inventory record found for product {product_id} at store {store_id}")
-                current_quantity = 0
-            else:
-                current_quantity = inventory_record.quantity
-            
-            # Get product and store details for context
-            product = Product.query.get(product_id)
-            store = Store.query.get(store_id)
+            # Get product and store to check if they exist
+            product = self.get_product(product_id)
+            store = self.get_store(store_id)
             
             if not product or not store:
-                logger.warning(f"Product or store not found. Product ID: {product_id}, Store ID: {store_id}")
+                logger.error(f"Product {product_id} or store {store_id} not found")
                 return {
-                    "error": "Product or store not found",
-                    "recommendation": "Unable to make recommendation due to missing data"
+                    "error": f"Product {product_id} or store {store_id} not found"
                 }
             
-            # Calculate total predicted demand
-            total_predicted_demand = sum(p.get('demand', 0) for p in demand_predictions)
-            avg_daily_demand = total_predicted_demand / len(demand_predictions) if demand_predictions else 0
+            # Get inventory record
+            inventory = db.session.query(InventoryRecord).filter_by(
+                product_id=product_id, store_id=store_id
+            ).first()
             
-            # Basic recommendations based on inventory levels and demand
-            if current_quantity <= 0:
-                status = "OUT_OF_STOCK"
-                urgency = "HIGH"
-            elif current_quantity < avg_daily_demand * 3:
-                status = "LOW_STOCK"
-                urgency = "MEDIUM"
-            elif current_quantity < avg_daily_demand * 7:
-                status = "ADEQUATE"
-                urgency = "LOW"
-            else:
-                status = "OVERSTOCKED"
-                urgency = "NONE"
-            
-            # Calculate recommended order quantity
-            # Target 14 days of inventory
-            target_inventory = avg_daily_demand * 14
-            recommended_order = max(0, target_inventory - current_quantity)
-            
-            # Use LLM to enhance recommendations if available
-            enhanced_recommendations = {}
-            if self.llm and self.llm.check_ollama_available():
-                logger.info("Using LLM to enhance inventory recommendations")
-                
-                # Create context for LLM
-                context = {
-                    "product": {
-                        "id": product.id,
-                        "name": product.name,
-                        "category": product.category,
-                        "base_price": product.base_price
-                    },
-                    "store": {
-                        "id": store.id,
-                        "name": store.name,
-                        "location": store.location
-                    },
-                    "inventory": {
-                        "current_quantity": current_quantity,
-                        "last_updated": inventory_record.last_updated.isoformat() if inventory_record else None
-                    },
-                    "demand": {
-                        "average_daily": avg_daily_demand,
-                        "total_predicted": total_predicted_demand,
-                        "days_forecasted": len(demand_predictions)
-                    },
-                    "preliminary_assessment": {
-                        "status": status,
-                        "urgency": urgency,
-                        "recommended_order": recommended_order
-                    }
+            if not inventory:
+                logger.error(f"No inventory record found for product {product_id} at store {store_id}")
+                return {
+                    "error": f"No inventory record found for product {product_id} at store {store_id}"
                 }
-                
-                # Prompt for LLM
-                prompt = f"""
-                Analyze the inventory situation for product "{product.name}" at store "{store.name}".
-                
-                Based on the provided context:
-                1. Evaluate if our preliminary inventory status assessment is accurate
-                2. Suggest an optimal order quantity based on demand patterns
-                3. Recommend inventory management actions
-                4. Provide risk assessment
-                
-                Return your analysis as a JSON object with these keys:
-                - "status": Current inventory status assessment
-                - "urgency": Urgency level for restocking
-                - "recommended_order": Optimal order quantity
-                - "reasoning": Brief explanation of recommendations
-                - "actions": Array of specific actions to take
-                - "risks": Any potential risks to consider
-                
-                ONLY return the JSON object, nothing else.
-                """
-                
-                llm_response = self.analyze_with_llm(
-                    prompt=prompt,
-                    context=context,
-                    system_prompt="You are an inventory optimization expert. Provide data-driven inventory recommendations."
-                )
-                
-                # Parse JSON from LLM response
-                try:
-                    # Extract JSON object if embedded in other text
-                    import re
-                    json_match = re.search(r'\{.*\}', llm_response, re.DOTALL)
-                    if json_match:
-                        llm_json = json_match.group(0)
-                        enhanced_recommendations = json.loads(llm_json)
-                    else:
-                        # Try to parse the whole response as JSON
-                        enhanced_recommendations = json.loads(llm_response)
-                        
-                    # Update recommended order from LLM if available
-                    if 'recommended_order' in enhanced_recommendations:
-                        try:
-                            llm_order = float(enhanced_recommendations['recommended_order'])
-                            # Only accept if reasonable
-                            if 0 <= llm_order <= 1000:
-                                recommended_order = llm_order
-                        except (ValueError, TypeError):
-                            pass
-                except Exception as e:
-                    logger.error(f"Failed to parse LLM recommendation JSON: {str(e)}")
             
-            # Build final recommendation
-            recommendation = {
-                "product_id": product_id,
-                "store_id": store_id,
-                "current_quantity": current_quantity,
-                "total_predicted_demand": total_predicted_demand,
-                "average_daily_demand": avg_daily_demand,
-                "status": enhanced_recommendations.get("status", status),
-                "urgency": enhanced_recommendations.get("urgency", urgency),
-                "recommended_order": round(recommended_order),
-                "reasoning": enhanced_recommendations.get("reasoning", "Based on current inventory and predicted demand"),
-                "timestamp": datetime.now().isoformat()
-            }
+            # Format last updated time
+            last_updated = inventory.last_updated.strftime("%Y-%m-%d %H:%M:%S") if inventory.last_updated else None
             
-            # Add actions if provided by LLM
-            if "actions" in enhanced_recommendations:
-                recommendation["actions"] = enhanced_recommendations["actions"]
-                
-            # Add risks if provided by LLM
-            if "risks" in enhanced_recommendations:
-                recommendation["risks"] = enhanced_recommendations["risks"]
-            
-            # Log action completion
-            self.log_action(
-                action="optimize_inventory_complete",
-                product_id=product_id,
-                store_id=store_id,
-                details={
-                    "status": recommendation["status"],
-                    "urgency": recommendation["urgency"],
-                    "recommended_order": recommendation["recommended_order"]
-                }
-            )
-            
-            return recommendation
-            
-        except Exception as e:
-            logger.error(f"Error in inventory optimization: {str(e)}")
-            self.log_action(
-                action="optimize_inventory_error",
-                product_id=product_id,
-                store_id=store_id,
-                details={
-                    "error": str(e)
-                }
-            )
             return {
-                "error": str(e),
-                "recommendation": "Error occurred during optimization"
+                "product_id": product_id,
+                "product_name": product.name,
+                "store_id": store_id,
+                "store_name": store.name,
+                "quantity": inventory.quantity,
+                "last_updated": last_updated
+            }
+        
+        except Exception as e:
+            logger.error(f"Error getting current inventory: {str(e)}")
+            return {
+                "error": f"Failed to get current inventory: {str(e)}"
             }
     
-    def update_inventory(self, product_id, store_id, new_quantity):
+    def update_inventory(self, product_id, store_id, quantity, action="manual update"):
         """
-        Update the inventory quantity for a product at a store.
+        Update inventory level for a product at a store.
         
         Args:
             product_id: ID of the product
             store_id: ID of the store
-            new_quantity: New inventory quantity
+            quantity: New inventory quantity
+            action: Description of the action that led to update
             
         Returns:
-            Boolean indicating success
+            Dictionary with update result
         """
         try:
-            # Log action start
-            self.log_action(
-                action="update_inventory_start",
-                product_id=product_id,
-                store_id=store_id,
-                details={
-                    "new_quantity": new_quantity
-                }
-            )
+            # Get product and store to check if they exist
+            product = self.get_product(product_id)
+            store = self.get_store(store_id)
             
-            # Find inventory record
-            inventory_record = InventoryRecord.query.filter_by(
-                product_id=product_id,
-                store_id=store_id
+            if not product or not store:
+                logger.error(f"Product {product_id} or store {store_id} not found")
+                return {
+                    "error": f"Product {product_id} or store {store_id} not found"
+                }
+            
+            # Get inventory record
+            inventory = db.session.query(InventoryRecord).filter_by(
+                product_id=product_id, store_id=store_id
             ).first()
             
-            old_quantity = 0
-            if inventory_record:
-                old_quantity = inventory_record.quantity
-                inventory_record.quantity = new_quantity
-                inventory_record.last_updated = datetime.now()
-            else:
-                # Create new record if it doesn't exist
-                inventory_record = InventoryRecord(
-                    product_id=product_id,
-                    store_id=store_id,
-                    quantity=new_quantity,
-                    last_updated=datetime.now()
-                )
-                db.session.add(inventory_record)
+            if not inventory:
+                logger.error(f"No inventory record found for product {product_id} at store {store_id}")
+                return {
+                    "error": f"No inventory record found for product {product_id} at store {store_id}"
+                }
+            
+            # Save old quantity for logging
+            old_quantity = inventory.quantity
+            
+            # Update inventory
+            inventory.quantity = quantity
+            inventory.last_updated = datetime.now()
             
             db.session.commit()
             
-            # Log action completion
+            # Log the agent action
+            details = {
+                "old_quantity": old_quantity,
+                "new_quantity": quantity,
+                "change": quantity - old_quantity,
+                "action": action
+            }
+            
             self.log_action(
-                action="update_inventory_complete",
+                action=f"Inventory update ({action})",
                 product_id=product_id,
                 store_id=store_id,
-                details={
-                    "old_quantity": old_quantity,
-                    "new_quantity": new_quantity,
-                    "change": new_quantity - old_quantity
-                }
+                details=details
             )
             
-            return True
-            
+            return {
+                "product_id": product_id,
+                "product_name": product.name,
+                "store_id": store_id,
+                "store_name": store.name,
+                "old_quantity": old_quantity,
+                "new_quantity": quantity,
+                "change": quantity - old_quantity,
+                "success": True
+            }
+        
         except Exception as e:
-            logger.error(f"Error updating inventory: {str(e)}")
             db.session.rollback()
+            logger.error(f"Error updating inventory: {str(e)}")
+            return {
+                "error": f"Failed to update inventory: {str(e)}",
+                "success": False
+            }
+    
+    def get_optimal_inventory_levels(self, product_id, store_id):
+        """
+        Calculate optimal inventory levels for a product at a store.
+        
+        Args:
+            product_id: ID of the product
+            store_id: ID of the store
             
+        Returns:
+            Dictionary with optimal inventory levels
+        """
+        try:
+            # Get product and store to check if they exist
+            product = self.get_product(product_id)
+            store = self.get_store(store_id)
+            
+            if not product or not store:
+                logger.error(f"Product {product_id} or store {store_id} not found")
+                return {
+                    "error": f"Product {product_id} or store {store_id} not found"
+                }
+            
+            # Calculate optimal inventory
+            optimal = calculate_optimal_inventory(product_id, store_id)
+            
+            # Log the agent action
             self.log_action(
-                action="update_inventory_error",
+                action="Optimal inventory calculation",
                 product_id=product_id,
                 store_id=store_id,
-                details={
-                    "error": str(e),
-                    "intended_quantity": new_quantity
-                }
+                details=optimal
             )
             
-            return False
+            # Add product and store names
+            result = {
+                "product_id": product_id,
+                "product_name": product.name,
+                "store_id": store_id,
+                "store_name": store.name,
+                **optimal
+            }
+            
+            return result
+        
+        except Exception as e:
+            logger.error(f"Error calculating optimal inventory: {str(e)}")
+            return {
+                "error": f"Failed to calculate optimal inventory: {str(e)}"
+            }
+    
+    def get_reorder_recommendation(self, product_id, store_id):
+        """
+        Get recommendation on whether to reorder and how much.
+        
+        Args:
+            product_id: ID of the product
+            store_id: ID of the store
+            
+        Returns:
+            Dictionary with reorder recommendation
+        """
+        try:
+            # Get product and store to check if they exist
+            product = self.get_product(product_id)
+            store = self.get_store(store_id)
+            
+            if not product or not store:
+                logger.error(f"Product {product_id} or store {store_id} not found")
+                return {
+                    "error": f"Product {product_id} or store {store_id} not found"
+                }
+            
+            # Get current inventory
+            inventory_response = self.get_current_inventory(product_id, store_id)
+            
+            if "error" in inventory_response:
+                return inventory_response
+            
+            current_stock = inventory_response.get("quantity", 0)
+            
+            # Get reorder recommendation
+            recommendation = get_reorder_recommendation(current_stock, product_id, store_id)
+            
+            # Log the agent action
+            self.log_action(
+                action="Reorder recommendation",
+                product_id=product_id,
+                store_id=store_id,
+                details=recommendation
+            )
+            
+            # Add product and store names
+            result = {
+                "product_id": product_id,
+                "product_name": product.name,
+                "store_id": store_id,
+                "store_name": store.name,
+                **recommendation
+            }
+            
+            return result
+        
+        except Exception as e:
+            logger.error(f"Error getting reorder recommendation: {str(e)}")
+            return {
+                "error": f"Failed to get reorder recommendation: {str(e)}"
+            }
+    
+    def get_stockout_risk(self, product_id, store_id):
+        """
+        Calculate the risk of stockout for a product at a store.
+        
+        Args:
+            product_id: ID of the product
+            store_id: ID of the store
+            
+        Returns:
+            Dictionary with stockout risk assessment
+        """
+        try:
+            # Get product and store to check if they exist
+            product = self.get_product(product_id)
+            store = self.get_store(store_id)
+            
+            if not product or not store:
+                logger.error(f"Product {product_id} or store {store_id} not found")
+                return {
+                    "error": f"Product {product_id} or store {store_id} not found"
+                }
+            
+            # Get current inventory
+            inventory_response = self.get_current_inventory(product_id, store_id)
+            
+            if "error" in inventory_response:
+                return inventory_response
+            
+            current_stock = inventory_response.get("quantity", 0)
+            
+            # Calculate stockout risk
+            risk = calculate_stockout_risk(current_stock, product_id, store_id)
+            
+            # Log the agent action
+            self.log_action(
+                action="Stockout risk assessment",
+                product_id=product_id,
+                store_id=store_id,
+                details=risk
+            )
+            
+            # Add product and store names
+            result = {
+                "product_id": product_id,
+                "product_name": product.name,
+                "store_id": store_id,
+                "store_name": store.name,
+                **risk
+            }
+            
+            return result
+        
+        except Exception as e:
+            logger.error(f"Error calculating stockout risk: {str(e)}")
+            return {
+                "error": f"Failed to calculate stockout risk: {str(e)}"
+            }
+    
+    def explain_recommendation(self, product_id, store_id):
+        """
+        Generate a natural language explanation of inventory recommendations.
+        
+        Args:
+            product_id: ID of the product
+            store_id: ID of the store
+            
+        Returns:
+            Dictionary with recommendation and explanation
+        """
+        try:
+            # Get product and store
+            product = self.get_product(product_id)
+            store = self.get_store(store_id)
+            
+            if not product or not store:
+                logger.error(f"Product {product_id} or store {store_id} not found")
+                return {
+                    "error": f"Product {product_id} or store {store_id} not found"
+                }
+            
+            # Get inventory data
+            inventory = self.get_current_inventory(product_id, store_id)
+            if "error" in inventory:
+                return inventory
+            
+            current_stock = inventory.get("quantity", 0)
+            
+            # Get reorder recommendation
+            recommendation = self.get_reorder_recommendation(product_id, store_id)
+            if "error" in recommendation:
+                return recommendation
+            
+            # Get stockout risk
+            risk = self.get_stockout_risk(product_id, store_id)
+            if "error" in risk:
+                return risk
+            
+            # Generate explanation using LLM if available
+            prompt = f"""
+            Please provide a brief explanation of the inventory recommendation for {product.name} at {store.name}.
+            
+            Product: {product.name}
+            Category: {product.category}
+            Current stock: {current_stock} units
+            
+            Recommendation:
+            - Should reorder: {"Yes" if recommendation.get("should_reorder") else "No"}
+            - Suggested order quantity: {recommendation.get("suggested_order")} units
+            - Reorder point: {recommendation.get("reorder_point")} units
+            - Days of stock remaining: {recommendation.get("days_remaining")} days
+            - Predicted demand (30 days): {recommendation.get("predicted_demand_30d")} units
+            - Urgency: {recommendation.get("urgency")}
+            
+            Stockout risk:
+            - Days until stockout: {risk.get("days_until_stockout")} days
+            - Stockout probability: {risk.get("stockout_probability") * 100}%
+            - Risk level: {risk.get("risk_level")}
+            
+            Please provide a 3-4 sentence explanation of this recommendation in plain language, 
+            focusing on actionable insights for the store manager.
+            """
+            
+            system_prompt = """
+            You are a helpful AI assistant explaining inventory recommendations to a store manager.
+            Your explanation should be clear, concise, and focused on actionable insights.
+            If the product needs to be reordered, emphasize the urgency and recommended quantity.
+            If the product doesn't need to be reordered, explain why and when it might need attention.
+            """
+            
+            explanation = self.analyze_with_llm(prompt, system_prompt)
+            
+            if not explanation or "error" in explanation.lower():
+                # Generate a basic explanation if LLM fails
+                if recommendation.get("should_reorder"):
+                    explanation = f"Recommend ordering {recommendation.get('suggested_order')} units of {product.name} for {store.name}. "
+                    if risk.get("days_until_stockout"):
+                        explanation += f"Current stock of {current_stock} units will be depleted in approximately {risk.get('days_until_stockout')} days. "
+                    explanation += f"Urgency level: {recommendation.get('urgency')}."
+                else:
+                    explanation = f"No need to reorder {product.name} for {store.name} at this time. "
+                    explanation += f"Current stock of {current_stock} units is sufficient for approximately {recommendation.get('days_remaining')} days. "
+                    explanation += f"Stockout risk is {risk.get('risk_level').lower()}."
+            
+            # Log the agent action
+            self.log_action(
+                action="Inventory recommendation explanation",
+                product_id=product_id,
+                store_id=store_id,
+                details={"explanation": explanation}
+            )
+            
+            return {
+                "product_id": product_id,
+                "product_name": product.name,
+                "store_id": store_id,
+                "store_name": store.name,
+                "current_stock": current_stock,
+                "recommendation": recommendation,
+                "stockout_risk": risk,
+                "explanation": explanation
+            }
+        
+        except Exception as e:
+            logger.error(f"Error explaining recommendation: {str(e)}")
+            return {
+                "error": f"Failed to explain recommendation: {str(e)}"
+            }

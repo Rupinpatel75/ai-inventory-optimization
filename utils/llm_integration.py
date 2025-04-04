@@ -1,192 +1,181 @@
-import os
+"""
+LLM integration utility for the AI Inventory Optimization System.
+
+This module provides integration with local LLMs (using Ollama) to
+add reasoning capabilities to agents in the system.
+"""
+
 import logging
-import json
-from typing import List, Dict, Any, Optional
+import os
 import requests
-import ollama
-from langchain_community.embeddings import OllamaEmbeddings
-from langchain_community.llms import Ollama as LangchainOllama
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
+import json
 
 logger = logging.getLogger(__name__)
 
-# Default Ollama URL for local deployment
-OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-DEFAULT_LLM_MODEL = os.environ.get("OLLAMA_LLM_MODEL", "llama3")
-DEFAULT_EMBEDDING_MODEL = os.environ.get("OLLAMA_EMBEDDING_MODEL", "mistral")
-
-class OllamaLLMManager:
+class LLMManager:
     """
-    Manager for Ollama LLM interactions.
-    Handles both direct LLM calls and embeddings.
+    Manager for LLM integration with Ollama.
+    
+    This class provides:
+    - Checking for Ollama availability
+    - Listing available models
+    - Sending chat completion requests
     """
     
-    def __init__(self, 
-                 base_url: str = OLLAMA_BASE_URL,
-                 llm_model: str = DEFAULT_LLM_MODEL,
-                 embedding_model: str = DEFAULT_EMBEDDING_MODEL):
+    def __init__(self, ollama_base_url="http://localhost:11434"):
         """
-        Initialize the Ollama LLM Manager
+        Initialize the LLM manager.
         
         Args:
-            base_url: URL for the Ollama API
-            llm_model: Model to use for LLM calls
-            embedding_model: Model to use for embeddings
+            ollama_base_url: Base URL for Ollama API
         """
-        self.base_url = base_url
-        self.llm_model = llm_model
-        self.embedding_model = embedding_model
+        self.ollama_base_url = ollama_base_url
+        self.available_models = []
+        self.preferred_model = None
+        self.ollama_available = False
         
-        # Initialize Ollama client
-        ollama.set_host(base_url)
-        
-        # Initialize LangChain components
-        try:
-            self.llm = LangchainOllama(model=llm_model, base_url=base_url)
-            self.embeddings = OllamaEmbeddings(model=embedding_model, base_url=base_url)
-            logger.info(f"Initialized Ollama LLM Manager with LLM model: {llm_model}, embedding model: {embedding_model}")
-        except Exception as e:
-            logger.warning(f"Failed to initialize Ollama components: {str(e)}. Will attempt to use when needed.")
-            self.llm = None
-            self.embeddings = None
+        # Check if Ollama is available
+        self._check_ollama_availability()
     
-    def check_ollama_available(self) -> bool:
-        """Check if Ollama is available and responsive"""
-        try:
-            response = requests.get(f"{self.base_url}/api/version")
-            return response.status_code == 200
-        except Exception as e:
-            logger.warning(f"Ollama service not available: {str(e)}")
-            return False
-    
-    def get_embedding(self, text: str) -> List[float]:
+    def _check_ollama_availability(self):
         """
-        Get embeddings for a text using Ollama
-        
-        Args:
-            text: The text to embed
-            
-        Returns:
-            List of floats representing the embedding vector
+        Check if Ollama is available and get available models.
         """
         try:
-            if self.embeddings is None:
-                self.embeddings = OllamaEmbeddings(model=self.embedding_model, base_url=self.base_url)
+            response = requests.get(f"{self.ollama_base_url}/api/tags", timeout=2)
             
-            embedding = self.embeddings.embed_query(text)
-            return embedding
-        except Exception as e:
-            logger.error(f"Error getting embedding: {str(e)}")
-            # Return a zero vector as fallback
-            return [0.0] * 384  # Common embedding size
-    
-    def get_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
-        """
-        Get embeddings for multiple texts
-        
-        Args:
-            texts: List of texts to embed
-            
-        Returns:
-            List of embedding vectors
-        """
-        try:
-            if self.embeddings is None:
-                self.embeddings = OllamaEmbeddings(model=self.embedding_model, base_url=self.base_url)
-            
-            embeddings = self.embeddings.embed_documents(texts)
-            return embeddings
-        except Exception as e:
-            logger.error(f"Error getting batch embeddings: {str(e)}")
-            # Return zero vectors as fallback
-            return [[0.0] * 384 for _ in texts]
-    
-    def calculate_similarity(self, embedding1: List[float], embedding2: List[float]) -> float:
-        """
-        Calculate cosine similarity between two embeddings
-        
-        Args:
-            embedding1: First embedding vector
-            embedding2: Second embedding vector
-            
-        Returns:
-            Similarity score (0-1)
-        """
-        try:
-            # Reshape for sklearn cosine similarity
-            e1 = np.array(embedding1).reshape(1, -1)
-            e2 = np.array(embedding2).reshape(1, -1)
-            
-            similarity = cosine_similarity(e1, e2)[0][0]
-            return float(similarity)
-        except Exception as e:
-            logger.error(f"Error calculating similarity: {str(e)}")
-            return 0.0
-    
-    def query_llm(self, prompt: str, system_prompt: str = None, temperature: float = 0.7) -> str:
-        """
-        Query the LLM with a prompt
-        
-        Args:
-            prompt: The user prompt to send
-            system_prompt: Optional system prompt for context
-            temperature: Controls randomness (0-1)
-            
-        Returns:
-            LLM response as text
-        """
-        try:
-            if self.check_ollama_available():
-                # Use direct Ollama API for more control
-                response = ollama.chat(
-                    model=self.llm_model,
-                    messages=[
-                        {"role": "system", "content": system_prompt or "You are a helpful assistant."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    options={"temperature": temperature}
-                )
-                return response['message']['content']
-            else:
-                logger.warning("Ollama not available, returning fallback response")
-                return "I'm unable to process your request at the moment."
-        except Exception as e:
-            logger.error(f"Error querying LLM: {str(e)}")
-            return f"Error: {str(e)}"
-    
-    def create_langchain(self, template: str, input_variables: List[str]) -> LLMChain:
-        """
-        Create a LangChain for structured LLM interactions
-        
-        Args:
-            template: The prompt template
-            input_variables: Variables to substitute in the template
-            
-        Returns:
-            LLMChain object
-        """
-        try:
-            if self.llm is None:
-                self.llm = LangchainOllama(model=self.llm_model, base_url=self.base_url)
+            if response.status_code == 200:
+                self.ollama_available = True
+                data = response.json()
+                models = data.get('models', [])
+                self.available_models = [model.get('name', '') for model in models if model.get('name')]
                 
-            prompt = PromptTemplate(
-                input_variables=input_variables,
-                template=template
-            )
+                # Choose preferred model based on what's available
+                # Preference order: llama3, llama2, mixtral, mistral, phi, gemma
+                preferred_options = ["llama3", "llama2", "mixtral", "mistral", "phi", "gemma"]
+                
+                for option in preferred_options:
+                    for model_name in self.available_models:
+                        if option in model_name.lower():
+                            self.preferred_model = model_name
+                            break
+                    if self.preferred_model:
+                        break
+                
+                logger.info(f"Ollama available: {len(self.available_models)} models found")
+                if self.preferred_model:
+                    logger.info(f"Using preferred model: {self.preferred_model}")
+                else:
+                    logger.warning("No preferred LLM model found")
+            else:
+                logger.warning("Ollama API returned non-200 status code")
+                self.ollama_available = False
+                
+        except (requests.RequestException, json.JSONDecodeError) as e:
+            logger.warning(f"Error checking Ollama availability: {str(e)}")
+            self.ollama_available = False
+    
+    def chat_completion(self, prompt, system_prompt=None, model=None):
+        """
+        Get a chat completion from the LLM.
+        
+        Args:
+            prompt: User prompt for the LLM
+            system_prompt: Optional system prompt
+            model: Optional model name (defaults to preferred_model)
             
-            chain = LLMChain(llm=self.llm, prompt=prompt)
-            return chain
+        Returns:
+            LLM response text or None if unavailable
+        """
+        if not self.ollama_available:
+            logger.warning("Ollama not available for chat completion")
+            return None
+        
+        model_to_use = model or self.preferred_model
+        
+        if not model_to_use:
+            logger.warning("No model specified and no preferred model available")
+            return None
+        
+        try:
+            # Prepare the request
+            url = f"{self.ollama_base_url}/api/chat"
+            
+            payload = {
+                "model": model_to_use,
+                "messages": []
+            }
+            
+            # Add system prompt if provided
+            if system_prompt:
+                payload["messages"].append({
+                    "role": "system",
+                    "content": system_prompt
+                })
+            
+            # Add user prompt
+            payload["messages"].append({
+                "role": "user",
+                "content": prompt
+            })
+            
+            # Send request
+            response = requests.post(url, json=payload, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return data.get('message', {}).get('content', '')
+            else:
+                logger.error(f"Error getting chat completion: {response.status_code} - {response.text}")
+                return None
+            
         except Exception as e:
-            logger.error(f"Error creating LangChain: {str(e)}")
+            logger.error(f"Error in chat completion: {str(e)}")
+            return None
+    
+    def generate_embedding(self, text, model=None):
+        """
+        Generate an embedding vector for the given text.
+        
+        Args:
+            text: Text to generate embedding for
+            model: Optional model name (defaults to preferred_model)
+            
+        Returns:
+            List of floats representing the embedding or None if unavailable
+        """
+        if not self.ollama_available:
+            logger.warning("Ollama not available for embedding generation")
+            return None
+        
+        model_to_use = model or self.preferred_model
+        
+        if not model_to_use:
+            logger.warning("No model specified and no preferred model available")
+            return None
+        
+        try:
+            # Prepare the request
+            url = f"{self.ollama_base_url}/api/embeddings"
+            
+            payload = {
+                "model": model_to_use,
+                "prompt": text
+            }
+            
+            # Send request
+            response = requests.post(url, json=payload, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                return data.get('embedding', [])
+            else:
+                logger.error(f"Error generating embedding: {response.status_code} - {response.text}")
+                return None
+            
+        except Exception as e:
+            logger.error(f"Error in embedding generation: {str(e)}")
             return None
 
-
-# Initialize a global instance for easy import
-try:
-    llm_manager = OllamaLLMManager()
-except Exception as e:
-    logger.warning(f"Failed to initialize global LLM Manager: {str(e)}")
-    llm_manager = None
+# Create a singleton instance
+llm_manager = LLMManager()

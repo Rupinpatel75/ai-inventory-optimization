@@ -1,90 +1,151 @@
-/* Custom styles for the AI Inventory Optimization System */
+/* Custom CSS styles for the AI Inventory Optimization System */
 
-/* Dark-mode compatible styles */
-body {
-    padding-bottom: 70px;
-}
-
-.navbar-brand svg {
-    vertical-align: text-bottom;
-}
-
-.card {
-    margin-bottom: 20px;
-    border-radius: 8px;
-}
-
-.card-header {
-    border-radius: 8px 8px 0 0 !important;
-}
-
-.footer {
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    z-index: 1000;
-}
-
-/* Dashboard styles */
-.dashboard-number {
-    font-size: 2rem;
-    font-weight: bold;
-}
-
-.dashboard-label {
-    font-size: 0.9rem;
-    color: var(--bs-secondary);
-}
-
-/* Chart container */
-.chart-container {
-    position: relative;
-    height: 300px;
-    width: 100%;
+/* Navbar branding */
+.navbar .brand-text {
+    font-weight: 600;
+    font-size: 1.2rem;
 }
 
 /* Status indicators */
-.status-indicator {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    margin-right: 5px;
+.llm-status {
+    display: flex;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 4px;
+    background-color: var(--bs-dark);
 }
 
-.status-low {
+.status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.status-online {
+    background-color: var(--bs-success);
+}
+
+.status-offline {
     background-color: var(--bs-danger);
 }
 
-.status-medium {
-    background-color: var(--bs-warning);
+/* Chart containers */
+.chart-container {
+    height: 300px;
+    position: relative;
 }
 
-.status-good {
-    background-color: var(--bs-success);
+/* Card styling */
+.card {
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-/* Agent type badges */
-.badge-demand {
-    background-color: var(--bs-primary);
+.card-header {
+    font-weight: 600;
 }
 
-.badge-inventory {
-    background-color: var(--bs-success);
+/* Table improvements */
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
-.badge-pricing {
-    background-color: var(--bs-warning);
-    color: var(--bs-dark);
+/* Recommendation badges */
+.recommendation-badge {
+    display: inline-block;
+    padding: 0.35em 0.65em;
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25rem;
+}
+
+/* Footer styling */
+.footer {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    padding: 15px 0;
+    background-color: var(--bs-dark);
+    font-size: 0.9rem;
+}
+
+/* Dashboard overview sections */
+.dashboard-stat {
+    text-align: center;
+    padding: 20px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.dashboard-stat-title {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    color: var(--bs-gray-500);
+    margin-bottom: 5px;
+}
+
+.dashboard-stat-value {
+    font-size: 2.5rem;
+    font-weight: 600;
+    color: var(--bs-info);
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-    .card-title {
-        font-size: 1.25rem;
+    .dashboard-stat-value {
+        font-size: 2rem;
     }
     
-    .dashboard-number {
-        font-size: 1.5rem;
+    .chart-container {
+        height: 250px;
     }
+}
+
+/* Details modal */
+.modal-content {
+    border: 1px solid var(--bs-gray-700);
+}
+
+/* Progress bars */
+.progress {
+    background-color: var(--bs-gray-800);
+}
+
+/* Add some padding to the body to account for fixed footer */
+body {
+    padding-bottom: 60px;
+    min-height: 100vh;
+    position: relative;
+}
+
+/* Make sure there's good spacing between content sections */
+.section-divider {
+    margin: 30px 0;
+    border-top: 1px solid var(--bs-gray-700);
+}
+
+/* Text styling */
+.text-highlight {
+    color: var(--bs-info);
+}
+
+/* Form elements */
+.form-select, .form-control {
+    background-color: var(--bs-gray-800);
+    border-color: var(--bs-gray-700);
+    color: var(--bs-light);
+}
+
+.form-select:focus, .form-control:focus {
+    background-color: var(--bs-gray-800);
+    border-color: var(--bs-info);
+    color: var(--bs-light);
+    box-shadow: 0 0 0 0.25rem rgba(13, 202, 240, 0.25);
 }

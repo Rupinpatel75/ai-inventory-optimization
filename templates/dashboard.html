@@ -1,67 +1,141 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - AI Inventory Optimization{% endblock %}
+{% block title %}AI Inventory Optimization System - Dashboard{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card">
+    <div class="col-12">
+        <div class="card bg-dark border-secondary">
+            <div class="card-header">
+                <h3>Inventory Optimization Dashboard</h3>
+            </div>
             <div class="card-body">
-                <h2 class="card-title">Dashboard</h2>
-                <p class="card-text">View and analyze inventory data across all stores and products.</p>
-                
-                <div class="row mt-4">
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0">Inventory Status by Store</h5>
-                            </div>
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card bg-dark border-info text-center">
                             <div class="card-body">
-                                <canvas id="inventoryByStoreChart" width="400" height="300"></canvas>
+                                <h5 class="card-title">Total Products</h5>
+                                <h2 class="display-4" id="total-products">-</h2>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0">Inventory Value by Category</h5>
-                            </div>
+                    <div class="col-md-3">
+                        <div class="card bg-dark border-info text-center">
                             <div class="card-body">
-                                <canvas id="inventoryByCategoryChart" width="400" height="300"></canvas>
+                                <h5 class="card-title">Total Stores</h5>
+                                <h2 class="display-4" id="total-stores">-</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-dark border-info text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">Stock Items</h5>
+                                <h2 class="display-4" id="stock-items">-</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-dark border-info text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">Predictions Made</h5>
+                                <h2 class="display-4" id="prediction-count">-</h2>
                             </div>
                         </div>
                     </div>
                 </div>
-                
-                <div class="row mt-4">
+
+                <div class="row mb-4">
                     <div class="col-md-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5 class="card-title mb-0">Inventory Report</h5>
+                        <div class="card bg-dark border-info">
+                            <div class="card-header bg-dark">
+                                <h4>Inventory Status Overview</h4>
+                            </div>
+                            <div class="card-body">
+                                <div class="chart-container" style="height: 300px;">
+                                    <canvas id="inventory-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card bg-dark border-info h-100">
+                            <div class="card-header bg-dark">
+                                <h4>Low Stock Items</h4>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
-                                    <table class="table table-striped">
+                                    <table class="table table-dark table-hover">
                                         <thead>
                                             <tr>
                                                 <th>Product</th>
-                                                <th>Category</th>
                                                 <th>Store</th>
-                                                <th>Location</th>
                                                 <th>Quantity</th>
-                                                <th>Base Price ($)</th>
-                                                <th>Value ($)</th>
-                                                <th>Last Updated</th>
                                                 <th>Status</th>
                                             </tr>
                                         </thead>
-                                        <tbody id="inventoryTable">
+                                        <tbody id="low-stock-table">
                                             <tr>
-                                                <td colspan="9" class="text-center">
-                                                    <div class="spinner-border" role="status">
-                                                        <span class="visually-hidden">Loading...</span>
-                                                    </div>
-                                                </td>
+                                                <td colspan="4" class="text-center">Loading data...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card bg-dark border-info h-100">
+                            <div class="card-header bg-dark">
+                                <h4>Price Recommendations</h4>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Product</th>
+                                                <th>Current</th>
+                                                <th>Recommended</th>
+                                                <th>Change</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="price-recommendations-table">
+                                            <tr>
+                                                <td colspan="4" class="text-center">Loading data...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="card bg-dark border-info">
+                            <div class="card-header bg-dark">
+                                <h4>Recent Agent Activity</h4>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Time</th>
+                                                <th>Agent</th>
+                                                <th>Action</th>
+                                                <th>Product</th>
+                                                <th>Store</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="agent-activity-table">
+                                            <tr>
+                                                <td colspan="5" class="text-center">Loading data...</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -79,211 +153,160 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Fetch inventory data
-    fetch('/api/inventory')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Process inventory data
-                const inventoryRecords = data.inventory;
-                
-                // Create inventory table
-                createInventoryTable(inventoryRecords);
-                
-                // Create store chart
-                createStoreChart(inventoryRecords);
-                
-                // Create category chart
-                createCategoryChart(inventoryRecords);
-            } else {
-                console.error('Error fetching inventory data');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-        });
+    // Initialize charts
+    let inventoryChart = null;
     
-    // Create inventory table
-    function createInventoryTable(records) {
-        const tableBody = document.getElementById('inventoryTable');
-        let tableHTML = '';
+    // Load dashboard data
+    loadDashboardData();
+    
+    // Function to load dashboard data
+    function loadDashboardData() {
+        // Load KPIs
+        loadKPIs();
         
-        // Get products to access price information
+        // Load inventory data
+        loadInventoryData();
+        
+        // Load low stock items
+        loadLowStockItems();
+        
+        // Load price recommendations
+        loadPriceRecommendations();
+        
+        // Load recent agent activity
+        loadAgentActivity();
+    }
+    
+    // Function to load KPIs
+    function loadKPIs() {
+        // Load products count
         fetch('/api/products')
             .then(response => response.json())
-            .then(productsData => {
-                if (productsData.success) {
-                    const products = productsData.products;
-                    
-                    // Build table rows
-                    records.forEach(record => {
-                        // Find product to get base price
-                        const product = products.find(p => p.id === record.product_id);
-                        const basePrice = product ? product.base_price : 0;
-                        const value = basePrice * record.quantity;
-                        
-                        // Determine status based on quantity
-                        let status, statusClass;
-                        if (record.quantity <= 10) {
-                            status = 'Low Stock';
-                            statusClass = 'text-danger';
-                        } else if (record.quantity <= 30) {
-                            status = 'Medium Stock';
-                            statusClass = 'text-warning';
-                        } else {
-                            status = 'Well Stocked';
-                            statusClass = 'text-success';
-                        }
-                        
-                        tableHTML += `
-                            <tr>
-                                <td>${record.product_name}</td>
-                                <td>${product ? product.category : 'N/A'}</td>
-                                <td>${record.store_name}</td>
-                                <td>${record.store_id}</td>
-                                <td>${record.quantity}</td>
-                                <td>${basePrice.toFixed(2)}</td>
-                                <td>${value.toFixed(2)}</td>
-                                <td>${new Date(record.last_updated).toLocaleDateString()}</td>
-                                <td class="${statusClass}">${status}</td>
-                            </tr>
-                        `;
-                    });
-                    
-                    tableBody.innerHTML = tableHTML;
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('total-products').textContent = data.products.length;
                 }
             })
-            .catch(error => {
-                console.error('Error fetching products:', error);
-            });
-    }
-    
-    // Create store chart
-    function createStoreChart(records) {
-        // Group records by store
-        const storeData = {};
-        records.forEach(record => {
-            if (!storeData[record.store_name]) {
-                storeData[record.store_name] = 0;
-            }
-            storeData[record.store_name] += record.quantity;
-        });
+            .catch(error => console.error('Error loading products:', error));
         
-        // Extract labels and data
-        const labels = Object.keys(storeData);
-        const data = Object.values(storeData);
-        
-        // Create chart
-        new Chart(document.getElementById('inventoryByStoreChart'), {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Total Items in Stock',
-                    data: data,
-                    backgroundColor: [
-                        'rgba(54, 162, 235, 0.7)',
-                        'rgba(255, 99, 132, 0.7)',
-                        'rgba(255, 205, 86, 0.7)',
-                        'rgba(75, 192, 192, 0.7)',
-                        'rgba(153, 102, 255, 0.7)'
-                    ],
-                    borderColor: [
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(255, 205, 86, 1)',
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(153, 102, 255, 1)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Items in Stock'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Store'
-                        }
-                    }
+        // Load stores count
+        fetch('/api/stores')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('total-stores').textContent = data.stores.length;
                 }
-            }
-        });
+            })
+            .catch(error => console.error('Error loading stores:', error));
+        
+        // Load inventory count
+        fetch('/api/inventory')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('stock-items').textContent = data.inventory.length;
+                }
+            })
+            .catch(error => console.error('Error loading inventory:', error));
+            
+        // For prediction count, we'll use a placeholder value for now
+        document.getElementById('prediction-count').textContent = "0";
     }
     
-    // Create category chart
-    function createCategoryChart(records) {
-        // We need products data to get categories
+    // Function to load inventory data and create chart
+    function loadInventoryData() {
+        fetch('/api/inventory')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    createInventoryChart(data.inventory);
+                }
+            })
+            .catch(error => console.error('Error loading inventory data:', error));
+    }
+    
+    // Function to create inventory chart
+    function createInventoryChart(inventory) {
+        // Group data by product category
+        const productMap = {};
+        const categories = new Set();
+        
+        // First get all products to map IDs to categories
         fetch('/api/products')
             .then(response => response.json())
-            .then(productsData => {
-                if (productsData.success) {
-                    const products = productsData.products;
-                    
-                    // Group by category and calculate value
-                    const categoryData = {};
-                    records.forEach(record => {
-                        const product = products.find(p => p.id === record.product_id);
-                        if (product) {
-                            const category = product.category;
-                            const value = product.base_price * record.quantity;
-                            
-                            if (!categoryData[category]) {
-                                categoryData[category] = 0;
-                            }
-                            categoryData[category] += value;
-                        }
+            .then(data => {
+                if (data.success) {
+                    // Create a map of product ID to category
+                    data.products.forEach(product => {
+                        productMap[product.id] = product.category;
+                        categories.add(product.category);
                     });
                     
-                    // Extract labels and data
+                    // Process inventory data by category
+                    const categoryData = {};
+                    categories.forEach(category => {
+                        categoryData[category] = 0;
+                    });
+                    
+                    inventory.forEach(item => {
+                        const category = productMap[item.product_id] || 'Unknown';
+                        categoryData[category] += item.quantity;
+                    });
+                    
+                    // Prepare chart data
                     const labels = Object.keys(categoryData);
                     const data = Object.values(categoryData);
                     
-                    // Create chart
-                    new Chart(document.getElementById('inventoryByCategoryChart'), {
-                        type: 'pie',
+                    // Generate colors
+                    const colors = [
+                        '#0dcaf0', '#6610f2', '#fd7e14', '#20c997', '#d63384',
+                        '#0d6efd', '#198754', '#dc3545', '#ffc107', '#6c757d'
+                    ];
+                    
+                    // Create/update chart
+                    const ctx = document.getElementById('inventory-chart').getContext('2d');
+                    
+                    // Destroy existing chart if it exists
+                    if (inventoryChart) {
+                        inventoryChart.destroy();
+                    }
+                    
+                    inventoryChart = new Chart(ctx, {
+                        type: 'bar',
                         data: {
                             labels: labels,
                             datasets: [{
-                                label: 'Inventory Value',
+                                label: 'Inventory Quantity by Category',
                                 data: data,
-                                backgroundColor: [
-                                    'rgba(255, 99, 132, 0.7)',
-                                    'rgba(54, 162, 235, 0.7)',
-                                    'rgba(255, 205, 86, 0.7)',
-                                    'rgba(75, 192, 192, 0.7)',
-                                    'rgba(153, 102, 255, 0.7)'
-                                ],
-                                borderColor: [
-                                    'rgba(255, 99, 132, 1)',
-                                    'rgba(54, 162, 235, 1)',
-                                    'rgba(255, 205, 86, 1)',
-                                    'rgba(75, 192, 192, 1)',
-                                    'rgba(153, 102, 255, 1)'
-                                ],
+                                backgroundColor: colors.slice(0, labels.length),
+                                borderColor: 'rgba(255, 255, 255, 0.2)',
                                 borderWidth: 1
                             }]
                         },
                         options: {
                             responsive: true,
+                            maintainAspectRatio: false,
                             plugins: {
                                 legend: {
-                                    position: 'top',
+                                    display: false
                                 },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(context) {
-                                            const label = context.label || '';
-                                            const value = context.raw;
-                                            return `${label}: $${value.toFixed(2)}`;
-                                        }
+                                title: {
+                                    display: true,
+                                    text: 'Inventory Quantity by Category'
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'Units'
+                                    }
+                                },
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Category'
                                     }
                                 }
                             }
@@ -291,10 +314,158 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 }
             })
+            .catch(error => console.error('Error loading product data:', error));
+    }
+    
+    // Function to load low stock items
+    function loadLowStockItems() {
+        fetch('/api/inventory')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Filter for items with low stock (less than 20 for demo)
+                    const lowStockItems = data.inventory
+                        .filter(item => item.quantity < 20)
+                        .sort((a, b) => a.quantity - b.quantity)
+                        .slice(0, 5);
+                    
+                    const tableBody = document.getElementById('low-stock-table');
+                    tableBody.innerHTML = '';
+                    
+                    if (lowStockItems.length === 0) {
+                        tableBody.innerHTML = '<tr><td colspan="4" class="text-center">No low stock items found</td></tr>';
+                        return;
+                    }
+                    
+                    lowStockItems.forEach(item => {
+                        const row = document.createElement('tr');
+                        
+                        // Define status class based on quantity
+                        let statusClass = 'bg-success';
+                        let statusText = 'OK';
+                        
+                        if (item.quantity < 5) {
+                            statusClass = 'bg-danger';
+                            statusText = 'Critical';
+                        } else if (item.quantity < 10) {
+                            statusClass = 'bg-warning';
+                            statusText = 'Low';
+                        }
+                        
+                        row.innerHTML = `
+                            <td>${item.product_name}</td>
+                            <td>${item.store_name}</td>
+                            <td>${item.quantity}</td>
+                            <td><span class="badge ${statusClass}">${statusText}</span></td>
+                        `;
+                        
+                        tableBody.appendChild(row);
+                    });
+                }
+            })
+            .catch(error => console.error('Error loading low stock items:', error));
+    }
+    
+    // Function to load price recommendations (simulated data for now)
+    function loadPriceRecommendations() {
+        // In a real system, we would have an API endpoint for this
+        // For now, we'll use simulated data
+        const tableBody = document.getElementById('price-recommendations-table');
+        tableBody.innerHTML = '';
+        
+        // Generate recommendations for the first 5 products
+        fetch('/api/products')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.products.length > 0) {
+                    const priceRecommendations = data.products.slice(0, 5).map(product => {
+                        const currentPrice = product.base_price;
+                        let changePercent;
+                        let recommendedPrice;
+                        
+                        // Generate a random change between -15% and +15%
+                        changePercent = (Math.random() * 30 - 15).toFixed(1);
+                        recommendedPrice = currentPrice * (1 + (parseFloat(changePercent) / 100));
+                        
+                        return {
+                            product_name: product.name,
+                            current_price: currentPrice,
+                            recommended_price: recommendedPrice,
+                            change_percent: changePercent
+                        };
+                    });
+                    
+                    priceRecommendations.forEach(rec => {
+                        const row = document.createElement('tr');
+                        
+                        // Define change class based on percentage
+                        let changeClass = 'bg-secondary';
+                        if (rec.change_percent > 0) {
+                            changeClass = 'bg-success';
+                        } else if (rec.change_percent < 0) {
+                            changeClass = 'bg-danger';
+                        }
+                        
+                        row.innerHTML = `
+                            <td>${rec.product_name}</td>
+                            <td>$${rec.current_price.toFixed(2)}</td>
+                            <td>$${rec.recommended_price.toFixed(2)}</td>
+                            <td><span class="badge ${changeClass}">${rec.change_percent > 0 ? '+' : ''}${rec.change_percent}%</span></td>
+                        `;
+                        
+                        tableBody.appendChild(row);
+                    });
+                } else {
+                    tableBody.innerHTML = '<tr><td colspan="4" class="text-center">No price recommendations available</td></tr>';
+                }
+            })
             .catch(error => {
-                console.error('Error fetching products:', error);
+                console.error('Error loading price recommendations:', error);
+                tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Error loading data</td></tr>';
             });
     }
+    
+    // Function to load recent agent activity
+    function loadAgentActivity() {
+        fetch('/api/logs?limit=5')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const tableBody = document.getElementById('agent-activity-table');
+                    tableBody.innerHTML = '';
+                    
+                    if (data.logs.length === 0) {
+                        tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No agent activity found</td></tr>';
+                        return;
+                    }
+                    
+                    data.logs.forEach(log => {
+                        const row = document.createElement('tr');
+                        
+                        // Format timestamp
+                        const timestamp = new Date(log.timestamp);
+                        const formattedTime = timestamp.toLocaleTimeString();
+                        
+                        // Format agent type
+                        const agentType = log.agent_type.charAt(0).toUpperCase() + log.agent_type.slice(1);
+                        
+                        row.innerHTML = `
+                            <td>${formattedTime}</td>
+                            <td>${agentType}</td>
+                            <td>${log.action}</td>
+                            <td>${log.product_name || 'N/A'}</td>
+                            <td>${log.store_name || 'N/A'}</td>
+                        `;
+                        
+                        tableBody.appendChild(row);
+                    });
+                }
+            })
+            .catch(error => console.error('Error loading agent activity:', error));
+    }
+    
+    // Set up periodic refresh
+    setInterval(loadDashboardData, 60000); // Refresh every minute
 });
 </script>
 {% endblock %}

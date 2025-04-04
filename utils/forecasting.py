@@ -1,42 +1,77 @@
+"""
+Forecasting module for the AI Inventory Optimization System.
+
+This module provides utilities for forecasting future demand based on
+historical data, seasonality factors, and other business metrics.
+"""
+
+import pandas as pd
+import numpy as np
 import logging
-import pickle
-import os
-import random
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
+from utils.data_loader import get_demand_metrics
 
 logger = logging.getLogger(__name__)
 
-def load_forecast_model():
+def load_forecast_model(product_id: int, store_id: int) -> Dict[str, Any]:
     """
-    Load the Prophet forecasting model from a pickle file.
-    If the model file doesn't exist, return None.
+    Load forecasting model for a specific product and store.
     
-    Returns:
-        Prophet model object or None if file not found
-    """
-    model_path = os.path.join('models', 'prophet_model.pkl')
-    
-    if os.path.exists(model_path):
-        try:
-            with open(model_path, 'rb') as f:
-                model = pickle.load(f)
-            logger.info(f"Loaded forecast model from {model_path}")
-            return model
-        except Exception as e:
-            logger.error(f"Error loading forecast model: {str(e)}")
-            return None
-    else:
-        logger.warning(f"No forecast model found at {model_path}")
-        return None
-
-def predict_demand(model, product_id, store_id, days=30):
-    """
-    Generate demand predictions using the Prophet model.
-    If the model is not available, use simulated data.
+    In a production system, this would load a trained machine learning model from storage.
+    For this demo, we'll use a simplified approach based on metrics from CSV data.
     
     Args:
-        model: Prophet model object
+        product_id: ID of the product
+        store_id: ID of the store
+        
+    Returns:
+        Dictionary with model parameters
+    """
+    try:
+        # Get demand metrics from CSV data
+        metrics = get_demand_metrics(product_id, store_id)
+        
+        if not metrics:
+            logger.warning(f"No demand metrics found for product {product_id} at store {store_id}")
+            # Return default model parameters
+            return {
+                "avg_daily_sales": 10,
+                "trend": 0.0,
+                "seasonality_factor": 1.0,
+                "promotion_effect": 0.0,
+                "price_elasticity": -1.5,
+                "competitor_impact": 0.0
+            }
+        
+        # Extract model parameters from metrics
+        model = {
+            "avg_daily_sales": metrics.get("avg_daily_sales", 10),
+            "trend": metrics.get("sales_trend", 0.0),
+            "seasonality_factor": metrics.get("seasonality_factor", 1.0),
+            "promotion_effect": metrics.get("promotion_effect", 0.0),
+            "price_elasticity": metrics.get("price_elasticity", -1.5),
+            "competitor_impact": metrics.get("competitor_impact", 0.0)
+        }
+        
+        return model
+    except Exception as e:
+        logger.error(f"Error loading forecast model: {str(e)}")
+        # Return default model parameters
+        return {
+            "avg_daily_sales": 10,
+            "trend": 0.0,
+            "seasonality_factor": 1.0,
+            "promotion_effect": 0.0,
+            "price_elasticity": -1.5,
+            "competitor_impact": 0.0
+        }
+
+def predict_demand(product_id: int, store_id: int, days: int = 30) -> List[Dict[str, Any]]:
+    """
+    Predict demand for a product at a specific store for the next N days.
+    
+    Args:
         product_id: ID of the product
         store_id: ID of the store
         days: Number of days to forecast
@@ -44,57 +79,80 @@ def predict_demand(model, product_id, store_id, days=30):
     Returns:
         List of dictionaries with date and predicted demand value
     """
-    if model is None:
-        logger.warning("No forecast model available, using simulated predictions")
-        return _generate_simulated_predictions(product_id, store_id, days)
-        
     try:
-        # In a real implementation, this would use the Prophet model
-        # For now, we'll use simulated data
-        return _generate_simulated_predictions(product_id, store_id, days)
+        # Load model parameters
+        model = load_forecast_model(product_id, store_id)
+        
+        # Generate predictions
+        predictions = []
+        base_demand = model["avg_daily_sales"]
+        trend = model["trend"]
+        seasonality_factor = model["seasonality_factor"]
+        
+        today = datetime.now()
+        
+        for i in range(days):
+            day_offset = i + 1
+            forecast_date = today + timedelta(days=day_offset)
+            
+            # Apply trend (percentage change per day)
+            trend_factor = 1.0 + (trend * day_offset / 100)
+            
+            # Apply day-of-week seasonality (simplified: weekends have higher demand)
+            day_of_week = forecast_date.weekday()
+            day_factor = 1.2 if day_of_week >= 5 else 1.0  # Higher demand on weekends
+            
+            # Apply month seasonality (simplified: Q4 has higher demand)
+            month = forecast_date.month
+            month_factor = 1.3 if month >= 10 else 1.0  # Higher demand in Q4
+            
+            # Apply a slight randomness to make the forecast more realistic
+            noise = np.random.normal(1.0, 0.05)  # Random factor with mean 1.0 and std 0.05
+            
+            # Calculate demand
+            demand = base_demand * trend_factor * day_factor * month_factor * seasonality_factor * noise
+            
+            # Ensure demand is positive
+            demand = max(demand, 0)
+            
+            # Format date
+            date_str = forecast_date.strftime("%Y-%m-%d")
+            
+            predictions.append({
+                "date": date_str,
+                "demand": round(demand, 1)
+            })
+        
+        return predictions
     except Exception as e:
         logger.error(f"Error predicting demand: {str(e)}")
-        return _generate_simulated_predictions(product_id, store_id, days)
+        # Return basic predictions on error
+        return _generate_fallback_predictions(days)
 
-def _generate_simulated_predictions(product_id, store_id, days):
+def _generate_fallback_predictions(days: int) -> List[Dict[str, Any]]:
     """
-    Generate simulated demand predictions when the Prophet model is unavailable.
+    Generate fallback predictions if the forecasting model fails.
     
     Args:
-        product_id: ID of the product
-        store_id: ID of the store
         days: Number of days to forecast
         
     Returns:
-        List of dictionaries with date and simulated demand value
+        List of dictionaries with date and predicted demand value
     """
     predictions = []
-    base_demand = random.randint(5, 20)  # Random base demand between 5-20 units
-    
-    # Add some product-specific variation
-    product_factor = (product_id % 5) + 0.8  # 0.8-4.8 range
-    
-    # Add some store-specific variation
-    store_factor = (store_id % 3) + 0.9  # 0.9-2.9 range
-    
     today = datetime.now()
     
-    for day in range(days):
-        date = today + timedelta(days=day)
+    for i in range(days):
+        day_offset = i + 1
+        forecast_date = today + timedelta(days=day_offset)
+        date_str = forecast_date.strftime("%Y-%m-%d")
         
-        # Day of week factor (weekend boost)
-        weekday = date.weekday()
-        day_factor = 1.3 if weekday >= 5 else 1.0  # Weekend boost
-        
-        # Add some randomness
-        random_factor = random.uniform(0.8, 1.2)
-        
-        # Calculate demand
-        demand = round(base_demand * product_factor * store_factor * day_factor * random_factor)
+        # Generate a random demand between 5 and 15
+        demand = np.random.uniform(5, 15)
         
         predictions.append({
-            'date': date.strftime('%Y-%m-%d'),
-            'demand': demand
+            "date": date_str,
+            "demand": round(demand, 1)
         })
     
     return predictions

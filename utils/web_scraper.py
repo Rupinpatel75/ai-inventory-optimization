@@ -1,260 +1,192 @@
+"""
+Web scraper utility for the AI Inventory Optimization System.
+
+This module provides web scraping functionality to gather data
+from external sources to enhance inventory optimization decisions.
+"""
+
 import logging
-import json
+import re
+import random
 import requests
 from bs4 import BeautifulSoup
-from typing import Dict, List, Optional, Any, Union
 import trafilatura
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 class WebScraper:
     """
-    Utility for scraping web content for agent use.
-    Provides methods to extract data from websites and APIs.
+    Web scraper for gathering external data to enhance inventory optimization.
+    
+    Capabilities:
+    - Extracting text content from web pages
+    - Collecting competitor pricing information
+    - Gathering market trend data
     """
     
-    def __init__(self, user_agent: str = None):
-        """
-        Initialize the web scraper with optional custom user agent
-        
-        Args:
-            user_agent: Optional custom user agent string
-        """
-        self.user_agent = user_agent or 'Mozilla/5.0 (AI Inventory Optimization Agent/1.0)'
+    def __init__(self):
+        """Initialize the web scraper."""
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': self.user_agent
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
-        logger.info("Web scraper initialized")
     
-    def extract_text_content(self, url: str) -> str:
+    def extract_text_content(self, url):
         """
-        Extract the main text content from a webpage using Trafilatura
+        Extract main text content from a web page.
         
         Args:
-            url: URL of the webpage to scrape
+            url: URL of the web page
             
         Returns:
-            Extracted text content
+            String with extracted text content
         """
         try:
+            # Use trafilatura for more accurate content extraction
             downloaded = trafilatura.fetch_url(url)
-            if downloaded:
-                text = trafilatura.extract(downloaded)
-                if text:
-                    logger.info(f"Successfully extracted text from {url}")
-                    return text
-                else:
-                    logger.warning(f"No text content found at {url}")
-                    return ""
-            else:
-                logger.warning(f"Failed to download content from {url}")
-                return ""
+            text = trafilatura.extract(downloaded)
+            
+            if not text:
+                # Fallback to BeautifulSoup if trafilatura fails
+                response = self.session.get(url, timeout=10)
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # Remove script and style elements
+                for script in soup(["script", "style"]):
+                    script.extract()
+                
+                # Get text
+                text = soup.get_text()
+                
+                # Break into lines and remove leading/trailing space
+                lines = (line.strip() for line in text.splitlines())
+                # Break multi-headlines into a line each
+                chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+                # Remove blank lines
+                text = '\n'.join(chunk for chunk in chunks if chunk)
+            
+            return text or f"No content could be extracted from {url}"
+            
         except Exception as e:
-            logger.error(f"Error extracting text from {url}: {str(e)}")
-            return ""
+            logger.error(f"Error extracting content from {url}: {str(e)}")
+            return f"Error extracting content: {str(e)}"
     
-    def scrape_html(self, url: str) -> Optional[BeautifulSoup]:
+    def extract_prices(self, url, product_name):
         """
-        Scrape HTML from a webpage and return BeautifulSoup object
+        Extract prices for a specific product from a web page.
         
         Args:
-            url: URL of the webpage to scrape
+            url: URL of the web page
+            product_name: Name of the product to find prices for
             
         Returns:
-            BeautifulSoup object or None on failure
+            List of dictionaries with prices and source information
         """
         try:
+            # Get page content
             response = self.session.get(url, timeout=10)
-            response.raise_for_status()
-            
             soup = BeautifulSoup(response.text, 'html.parser')
-            logger.info(f"Successfully scraped HTML from {url}")
-            return soup
+            
+            # Extract text that might contain prices
+            text = soup.get_text()
+            
+            # Look for product name and nearby price patterns
+            prices = []
+            # Simple price regex pattern (matches common price formats like $19.99, €29, etc.)
+            price_pattern = r'(\$|€|£|\b)(\d+[.,]\d{1,2}|\d+)(\b|\s|$)'
+            
+            # Search for sentences containing the product name
+            product_regex = re.compile(re.escape(product_name), re.IGNORECASE)
+            
+            for element in soup.find_all(['p', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'li']):
+                text = element.get_text().strip()
+                if product_regex.search(text):
+                    # Look for price in this element or nearby elements
+                    price_matches = re.findall(price_pattern, text)
+                    if price_matches:
+                        for match in price_matches:
+                            # Format the price as a number
+                            currency, amount, _ = match
+                            amount = amount.replace(',', '.')
+                            price = float(amount)
+                            
+                            prices.append({
+                                'price': price,
+                                'currency': currency if currency else '$',
+                                'context': text[:100].strip() + '...',  # Context snippet
+                                'source': url
+                            })
+            
+            return prices
+            
         except Exception as e:
-            logger.error(f"Error scraping HTML from {url}: {str(e)}")
-            return None
-    
-    def extract_structured_data(self, soup: BeautifulSoup) -> List[Dict[str, Any]]:
-        """
-        Extract structured data (JSON-LD) from a webpage
-        
-        Args:
-            soup: BeautifulSoup object of the webpage
-            
-        Returns:
-            List of structured data objects
-        """
-        structured_data = []
-        
-        try:
-            # Look for JSON-LD scripts
-            ld_scripts = soup.find_all('script', {'type': 'application/ld+json'})
-            
-            for script in ld_scripts:
-                try:
-                    data = json.loads(script.string)
-                    structured_data.append(data)
-                except (json.JSONDecodeError, TypeError):
-                    continue
-            
-            logger.info(f"Extracted {len(structured_data)} structured data objects")
-            return structured_data
-        except Exception as e:
-            logger.error(f"Error extracting structured data: {str(e)}")
+            logger.error(f"Error extracting prices from {url} for {product_name}: {str(e)}")
             return []
     
-    def call_api(self, 
-                url: str, 
-                method: str = 'GET', 
-                params: Dict[str, Any] = None, 
-                data: Dict[str, Any] = None, 
-                headers: Dict[str, str] = None) -> Dict[str, Any]:
+    def get_competitor_prices(self, product_name, category=None, limit=5):
         """
-        Make an API call and return the response
+        Get competitor prices for a product.
+        
+        NOTE: In a real-world scenario, this would make actual requests to
+        competitor websites or price comparison sites. For this demo,
+        we'll generate simulated competitor pricing data.
         
         Args:
-            url: API endpoint URL
-            method: HTTP method (GET, POST, etc.)
-            params: URL parameters
-            data: Request body data
-            headers: Additional headers
+            product_name: Name of the product
+            category: Optional product category for more targeted results
+            limit: Maximum number of results to return
             
         Returns:
-            API response as dictionary
+            List of dictionaries with competitor price information
         """
         try:
-            api_headers = {'Content-Type': 'application/json'}
-            if headers:
-                api_headers.update(headers)
+            # In a real implementation, this would:
+            # 1. Search for the product on price comparison sites
+            # 2. Extract prices from competitor websites
+            # 3. Parse and normalize the data
             
-            response = self.session.request(
-                method=method,
-                url=url,
-                params=params,
-                json=data if data else None,
-                headers=api_headers,
-                timeout=15
-            )
-            
-            response.raise_for_status()
-            
-            if response.text:
-                result = response.json()
-                logger.info(f"Successful API call to {url}")
-                return {'success': True, 'data': result}
-            else:
-                return {'success': True, 'data': None}
-                
-        except requests.exceptions.HTTPError as e:
-            logger.error(f"HTTP error during API call to {url}: {str(e)}")
-            error_response = {'success': False, 'error': f"HTTP error: {str(e)}"}
-            
-            # Try to extract error message from response
-            try:
-                error_data = e.response.json()
-                error_response['error_data'] = error_data
-            except:
-                error_response['status_code'] = e.response.status_code
-                
-            return error_response
-            
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Request error during API call to {url}: {str(e)}")
-            return {'success': False, 'error': f"Request error: {str(e)}"}
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error from API {url}: {str(e)}")
-            return {
-                'success': False, 
-                'error': f"Invalid JSON response", 
-                'raw_response': response.text[:500]  # Include first 500 chars of response
-            }
-            
-        except Exception as e:
-            logger.error(f"Unexpected error during API call to {url}: {str(e)}")
-            return {'success': False, 'error': f"Unexpected error: {str(e)}"}
-    
-    def extract_product_info(self, url: str) -> Dict[str, Any]:
-        """
-        Extract product information from a product page
-        
-        Args:
-            url: URL of the product page
-            
-        Returns:
-            Product information as dictionary
-        """
-        try:
-            soup = self.scrape_html(url)
-            if not soup:
-                return {}
-            
-            # Try to extract structured data first
-            structured_data = self.extract_structured_data(soup)
-            for data in structured_data:
-                if data.get('@type') == 'Product':
-                    return {
-                        'name': data.get('name', ''),
-                        'description': data.get('description', ''),
-                        'brand': data.get('brand', {}).get('name', '') if isinstance(data.get('brand'), dict) else data.get('brand', ''),
-                        'price': data.get('offers', {}).get('price', 0) if isinstance(data.get('offers'), dict) else 0,
-                        'currency': data.get('offers', {}).get('priceCurrency', 'USD') if isinstance(data.get('offers'), dict) else 'USD',
-                        'availability': data.get('offers', {}).get('availability', '') if isinstance(data.get('offers'), dict) else '',
-                        'url': url,
-                        'image': data.get('image', ''),
-                        'timestamp': datetime.now().isoformat()
-                    }
-            
-            # Fallback to basic extraction
-            product = {}
-            
-            # Try to find product name
-            name_candidates = [
-                soup.find('h1'),
-                soup.find('h1', {'class': lambda x: x and ('product' in x or 'title' in x)}),
-                soup.find(class_=lambda x: x and ('product-title' in x or 'product-name' in x))
+            # For demo purposes, generate simulated competitor data
+            competitors = [
+                "CompetitorA", "CompetitorB", "CompetitorC", 
+                "CompetitorD", "CompetitorE", "CompetitorF",
+                "CompetitorG", "CompetitorH", "CompetitorI"
             ]
             
-            for candidate in name_candidates:
-                if candidate and candidate.text.strip():
-                    product['name'] = candidate.text.strip()
-                    break
+            # Generate reasonable price range based on category
+            base_price = random.uniform(20, 100)
+            if category == "Electronics":
+                base_price = random.uniform(100, 500)
+            elif category == "Clothing":
+                base_price = random.uniform(20, 80)
+            elif category == "Groceries":
+                base_price = random.uniform(2, 15)
+            elif category == "Furniture":
+                base_price = random.uniform(100, 1000)
             
-            # Try to find price
-            price_candidates = [
-                soup.find(class_=lambda x: x and ('price' in x)),
-                soup.find('span', {'itemprop': 'price'}),
-                soup.find(attrs={'data-price-value': True})
-            ]
+            # Generate simulated competitor prices
+            prices = []
+            for i in range(min(limit, len(competitors))):
+                # Vary prices by up to 20% in either direction
+                variation = random.uniform(-0.2, 0.2)
+                price = base_price * (1 + variation)
+                
+                # Round to reasonable precision
+                price = round(price, 2)
+                
+                prices.append({
+                    "competitor": competitors[i],
+                    "price": price,
+                    "currency": "$",
+                    "product_name": product_name,
+                    "in_stock": random.random() > 0.2,  # 80% chance of being in stock
+                    "last_updated": "2023-04-04"  # In a real system, this would be the actual date
+                })
             
-            for candidate in price_candidates:
-                if candidate:
-                    price_text = candidate.get('content') or candidate.get('data-price-value') or candidate.text
-                    try:
-                        # Extract digits and decimal point
-                        import re
-                        price_match = re.search(r'(\d+\.?\d*)', str(price_text))
-                        if price_match:
-                            product['price'] = float(price_match.group(1))
-                            break
-                    except:
-                        continue
+            # Log the action
+            logger.info(f"Retrieved {len(prices)} competitor prices for {product_name}")
             
-            # Add basic metadata
-            product.update({
-                'url': url,
-                'timestamp': datetime.now().isoformat()
-            })
-            
-            logger.info(f"Extracted product info from {url}")
-            return product
+            return prices
             
         except Exception as e:
-            logger.error(f"Error extracting product info from {url}: {str(e)}")
-            return {}
-
-
-# Create a global instance for easy import
-scraper = WebScraper()
+            logger.error(f"Error getting competitor prices for {product_name}: {str(e)}")
+            return []

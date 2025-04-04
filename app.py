@@ -70,7 +70,7 @@ def init_sample_data():
 def register_blueprints():
     """Register Flask blueprints for routes."""
     # Import routes at runtime to avoid circular imports
-    from routes import register_routes
+    from routes_simplified import register_routes
     register_routes(app)
 
 # Flask application setup

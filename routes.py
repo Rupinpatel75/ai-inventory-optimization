@@ -9,11 +9,8 @@ import json
 import logging
 from datetime import datetime, timedelta
 from flask import render_template, request, jsonify, redirect, url_for, flash, session, send_from_directory
-from models import (
-    db, Product, Store, Supplier, Inventory, Sale, User, 
-    SystemConfig, DataImport, Forecast, AgentLog, PriceHistory,
-    Promotion, CompetitorPrice
-)
+from app import db
+from models_simplified import Product, Store, Inventory, AgentLog, User
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +27,9 @@ def register_routes(app):
     def dashboard():
         """Render the main dashboard."""
         # Get counts for the dashboard
-        product_count = db.session.query(Product).filter_by(active=True).count()
-        store_count = db.session.query(Store).filter_by(active=True).count()
+        product_count = db.session.query(Product).count()
+        store_count = db.session.query(Store).count()
         inventory_count = db.session.query(Inventory).count()
-        supplier_count = db.session.query(Supplier).filter_by(active=True).count()
         
         # Get recent agent logs
         recent_logs = db.session.query(AgentLog).order_by(
@@ -45,8 +41,6 @@ def register_routes(app):
             db.func.sum(Product.base_price * Inventory.quantity)
         ).join(
             Inventory, Product.id == Inventory.product_id
-        ).filter(
-            Product.active == True
         ).scalar()
         
         total_inventory_value = inventory_value_query or 0
@@ -59,9 +53,7 @@ def register_routes(app):
         ).join(
             Store, Store.id == Inventory.store_id
         ).filter(
-            Inventory.quantity <= Inventory.reorder_point,
-            Product.active == True,
-            Store.active == True
+            Inventory.quantity <= Inventory.reorder_point
         ).limit(10).all()
         
         return render_template(
@@ -69,7 +61,7 @@ def register_routes(app):
             product_count=product_count,
             store_count=store_count,
             inventory_count=inventory_count,
-            supplier_count=supplier_count,
+            supplier_count=0,  # Not in simplified model
             recent_logs=recent_logs,
             total_inventory_value=total_inventory_value,
             low_stock_items=low_stock_items

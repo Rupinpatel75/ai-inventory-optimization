@@ -42,3 +42,11 @@ numpy
 pandas
 trafilatura
 trafilatura
+flask
+flask-sqlalchemy
+numpy
+pandas
+trafilatura
+gunicorn
+werkzeug
+flask

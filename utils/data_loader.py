@@ -1,8 +1,10 @@
-import os
 import logging
+import random
 import pandas as pd
-import numpy as np
+import os
 from datetime import datetime, timedelta
+from typing import Dict, List, Any, Optional
+
 from app import db
 from models import Product, Store, InventoryRecord
 
@@ -16,53 +18,62 @@ def load_sample_data():
     Returns:
         Boolean indicating success
     """
+    # Check if we already have data
+    if Product.query.count() > 0:
+        logger.info("Database already contains data, skipping sample data load")
+        return True
+    
     try:
-        # Check if data already exists
-        if Product.query.count() > 0:
-            logger.info("Database already contains data, skipping sample data loading")
-            return True
-        
         # Add sample products
         products = [
-            Product(name="Laptop", category="Electronics", base_price=899.99),
-            Product(name="Smartphone", category="Electronics", base_price=599.99),
-            Product(name="Headphones", category="Electronics", base_price=149.99),
-            Product(name="T-shirt", category="Clothing", base_price=19.99),
-            Product(name="Jeans", category="Clothing", base_price=39.99)
+            Product(name="T-Shirt Basic", category="Apparel", base_price=19.99),
+            Product(name="Premium Jeans", category="Apparel", base_price=59.99),
+            Product(name="Smartphone X", category="Electronics", base_price=699.99),
+            Product(name="Wireless Earbuds", category="Electronics", base_price=129.99),
+            Product(name="Coffee Maker", category="Home Goods", base_price=89.99),
+            Product(name="Blender Pro", category="Home Goods", base_price=49.99),
+            Product(name="Running Shoes", category="Footwear", base_price=79.99),
+            Product(name="Casual Sneakers", category="Footwear", base_price=49.99),
+            Product(name="Vitamin C Serum", category="Health & Beauty", base_price=24.99),
+            Product(name="Moisturizing Cream", category="Health & Beauty", base_price=15.99)
         ]
+        
         db.session.add_all(products)
-        db.session.flush()  # Flush to get IDs
+        db.session.commit()
+        logger.info(f"Added {len(products)} sample products")
         
         # Add sample stores
         stores = [
-            Store(name="Main Street Store", location="New York"),
-            Store(name="Downtown Branch", location="Los Angeles"),
-            Store(name="Shopping Mall", location="Chicago")
+            Store(name="Downtown Store", location="123 Main St, Downtown"),
+            Store(name="Westside Mall", location="456 West Blvd, Westside"),
+            Store(name="Eastside Plaza", location="789 East Ave, Eastside"),
+            Store(name="Suburban Outlet", location="101 Suburb Rd, Suburbia")
         ]
-        db.session.add_all(stores)
-        db.session.flush()  # Flush to get IDs
         
-        # Add sample inventory records
+        db.session.add_all(stores)
+        db.session.commit()
+        logger.info(f"Added {len(stores)} sample stores")
+        
+        # Add sample inventory
         inventory_records = []
+        
         for product in products:
             for store in stores:
-                # Generate a slightly different quantity for each product/store
-                quantity = np.random.randint(20, 100)
-                
-                record = InventoryRecord(
-                    product_id=product.id,
-                    store_id=store.id,
-                    quantity=quantity,
-                    last_updated=datetime.now()
+                # Random inventory levels
+                inventory_records.append(
+                    InventoryRecord(
+                        product_id=product.id,
+                        store_id=store.id,
+                        quantity=random.randint(5, 100),
+                        last_updated=datetime.now() - timedelta(days=random.randint(0, 30))
+                    )
                 )
-                inventory_records.append(record)
         
         db.session.add_all(inventory_records)
         db.session.commit()
+        logger.info(f"Added {len(inventory_records)} sample inventory records")
         
-        logger.info(f"Successfully loaded sample data: {len(products)} products, {len(stores)} stores")
         return True
-        
     except Exception as e:
         logger.error(f"Error loading sample data: {str(e)}")
         db.session.rollback()
@@ -78,53 +89,94 @@ def generate_historical_sales_data(days=90):
     Returns: 
         DataFrame with historical sales data
     """
+    # Get all products and stores
     products = Product.query.all()
     stores = Store.query.all()
     
     if not products or not stores:
-        logger.error("No products or stores in database")
-        return None
+        logger.warning("No products or stores found for generating historical data")
+        return pd.DataFrame()
     
+    # Prepare data structure
     data = []
     end_date = datetime.now()
     start_date = end_date - timedelta(days=days)
     
+    # Generate sales data for each product at each store
     for product in products:
         for store in stores:
-            # Create a base demand that's consistent for this product/store
-            base_demand = (product.id * 7) + (store.id * 5)
+            # Get current inventory as a reference point
+            inventory_record = InventoryRecord.query.filter_by(
+                product_id=product.id,
+                store_id=store.id
+            ).first()
             
-            # Generate daily data
+            avg_daily_sales = random.randint(2, 10)  # Base average daily sales
+            
+            # Generate daily sales with variations
             current_date = start_date
             while current_date <= end_date:
-                # Add weekly seasonality (higher on weekends)
+                # Daily, weekly, and seasonal patterns
                 day_of_week = current_date.weekday()
-                seasonal_factor = 1.3 if day_of_week >= 5 else 1.0
+                week_of_year = current_date.isocalendar()[1]
                 
-                # Add monthly trend (increasing sales over time)
-                days_since_start = (current_date - start_date).days
-                trend_factor = 1.0 + (days_since_start * 0.001)
+                # Weekend boost
+                day_factor = 1.5 if day_of_week >= 5 else 1.0
                 
-                # Add some randomness
-                noise = np.random.normal(1.0, 0.2)
+                # Seasonal variations (simplified)
+                month = current_date.month
+                if month in [11, 12]:  # Holiday season
+                    seasonal_factor = 1.3
+                elif month in [6, 7, 8]:  # Summer
+                    seasonal_factor = 1.2 if product.category in ["Apparel", "Footwear"] else 1.0
+                else:
+                    seasonal_factor = 1.0
                 
-                # Calculate sales quantity
-                quantity = round(base_demand * seasonal_factor * trend_factor * noise)
-                quantity = max(0, quantity)  # Ensure non-negative
+                # Product-specific trend
+                trend_factor = 1.0 + (0.001 * (current_date - start_date).days)
+                
+                # Random noise
+                noise = random.uniform(0.7, 1.3)
+                
+                # Calculate sales
+                sales = round(avg_daily_sales * day_factor * seasonal_factor * trend_factor * noise)
                 
                 data.append({
-                    'date': current_date,
+                    'date': current_date.strftime('%Y-%m-%d'),
                     'product_id': product.id,
                     'product_name': product.name,
                     'store_id': store.id,
                     'store_name': store.name,
-                    'quantity': quantity
+                    'sales': sales,
+                    'price': product.base_price
                 })
                 
                 current_date += timedelta(days=1)
     
     # Convert to DataFrame
     df = pd.DataFrame(data)
+    logger.info(f"Generated historical sales data: {len(df)} records")
     
-    logger.info(f"Generated {len(df)} historical sales records for {len(products)} products across {len(stores)} stores")
     return df
+
+def load_external_data(data_path):
+    """
+    Load external data from CSV files.
+    
+    Args:
+        data_path: Path to the data file
+        
+    Returns:
+        DataFrame with loaded data
+    """
+    try:
+        if os.path.exists(data_path):
+            df = pd.read_csv(data_path)
+            logger.info(f"Loaded external data from {data_path}: {len(df)} records")
+            return df
+        else:
+            logger.warning(f"Data file not found: {data_path}")
+            return pd.DataFrame()
+    except Exception as e:
+        logger.error(f"Error loading external data: {str(e)}")
+        return pd.DataFrame()

@@ -1,11 +1,9 @@
-import os
 import logging
-import numpy as np
-import pandas as pd
 import pickle
+import os
+import random
 from datetime import datetime, timedelta
-import json
-from pathlib import Path
+from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -17,19 +15,19 @@ def load_forecast_model():
     Returns:
         Prophet model object or None if file not found
     """
-    model_path = os.path.join("utils", "demand_model.pkl")
+    model_path = os.path.join('models', 'prophet_model.pkl')
     
-    try:
-        if os.path.exists(model_path):
-            with open(model_path, "rb") as f:
+    if os.path.exists(model_path):
+        try:
+            with open(model_path, 'rb') as f:
                 model = pickle.load(f)
-            logger.info("Prophet model loaded successfully")
+            logger.info(f"Loaded forecast model from {model_path}")
             return model
-        else:
-            logger.warning(f"Model file not found at {model_path}")
+        except Exception as e:
+            logger.error(f"Error loading forecast model: {str(e)}")
             return None
-    except Exception as e:
-        logger.error(f"Error loading model: {str(e)}")
+    else:
+        logger.warning(f"No forecast model found at {model_path}")
         return None
 
 def predict_demand(model, product_id, store_id, days=30):
@@ -46,34 +44,16 @@ def predict_demand(model, product_id, store_id, days=30):
     Returns:
         List of dictionaries with date and predicted demand value
     """
+    if model is None:
+        logger.warning("No forecast model available, using simulated predictions")
+        return _generate_simulated_predictions(product_id, store_id, days)
+        
     try:
-        if model is None:
-            logger.warning("No Prophet model available, using simulated data")
-            return _generate_simulated_predictions(product_id, store_id, days)
-        
-        # In a real system, we would prepare the forecast dataframe
-        # with historical data specific to this product/store
-        
-        # For this demo, we'll create a future dataframe for Prophet
-        future_dates = pd.DataFrame({
-            'ds': [datetime.now() + timedelta(days=i) for i in range(days)]
-        })
-        
-        # Make predictions
-        forecast = model.predict(future_dates)
-        
-        # Extract relevant columns and convert to list of dictionaries
-        predictions = []
-        for _, row in forecast.iterrows():
-            predictions.append({
-                'date': row['ds'].strftime('%Y-%m-%d'),
-                'value': round(max(0, row['yhat']), 2)  # Ensure non-negative values
-            })
-        
-        return predictions
-        
+        # In a real implementation, this would use the Prophet model
+        # For now, we'll use simulated data
+        return _generate_simulated_predictions(product_id, store_id, days)
     except Exception as e:
-        logger.error(f"Error in demand prediction: {str(e)}")
+        logger.error(f"Error predicting demand: {str(e)}")
         return _generate_simulated_predictions(product_id, store_id, days)
 
 def _generate_simulated_predictions(product_id, store_id, days):
@@ -88,35 +68,33 @@ def _generate_simulated_predictions(product_id, store_id, days):
     Returns:
         List of dictionaries with date and simulated demand value
     """
-    # Create a seed based on product and store IDs for consistent randomness
-    np.random.seed(product_id * 100 + store_id)
-    
-    # Generate baseline demand (different for each product/store combination)
-    baseline = 10 + (product_id % 5) * 5 + (store_id % 3) * 3
-    
-    # Create date range
-    start_date = datetime.now()
     predictions = []
+    base_demand = random.randint(5, 20)  # Random base demand between 5-20 units
     
-    for i in range(days):
-        current_date = start_date + timedelta(days=i)
+    # Add some product-specific variation
+    product_factor = (product_id % 5) + 0.8  # 0.8-4.8 range
+    
+    # Add some store-specific variation
+    store_factor = (store_id % 3) + 0.9  # 0.9-2.9 range
+    
+    today = datetime.now()
+    
+    for day in range(days):
+        date = today + timedelta(days=day)
         
-        # Add weekly seasonality (higher on weekends)
-        day_of_week = current_date.weekday()
-        seasonal_factor = 1.3 if day_of_week >= 5 else 1.0
+        # Day of week factor (weekend boost)
+        weekday = date.weekday()
+        day_factor = 1.3 if weekday >= 5 else 1.0  # Weekend boost
         
-        # Add slight trend
-        trend = 1.0 + (i * 0.005)
-        
-        # Add randomness
-        noise = np.random.normal(1.0, 0.15)
+        # Add some randomness
+        random_factor = random.uniform(0.8, 1.2)
         
         # Calculate demand
-        demand = baseline * seasonal_factor * trend * noise
+        demand = round(base_demand * product_factor * store_factor * day_factor * random_factor)
         
         predictions.append({
-            'date': current_date.strftime('%Y-%m-%d'),
-            'value': round(max(0, demand), 2)  # Ensure non-negative values
+            'date': date.strftime('%Y-%m-%d'),
+            'demand': demand
         })
     
     return predictions

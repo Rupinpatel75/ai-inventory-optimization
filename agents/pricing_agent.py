@@ -1,26 +1,24 @@
 import logging
 import json
 import random
+from typing import Dict, List, Any, Optional
 from datetime import datetime
+
+from agents.base_agent import BaseAgent
+from models import Product, InventoryRecord
 from app import db
-from models import AgentAction, Product, Store, InventoryRecord
 
 logger = logging.getLogger(__name__)
 
-class PricingAgent:
+class PricingAgent(BaseAgent):
     """
     Agent responsible for determining optimal pricing strategies
     based on demand predictions and inventory levels.
     """
     
     def __init__(self):
-        self.name = "Pricing Agent"
+        super().__init__("Pricing Agent", "pricing")
         logger.info("Pricing Agent initialized")
-        
-        # Configuration parameters
-        self.min_profit_margin = 0.15  # Minimum profit margin to maintain
-        self.max_discount = 0.30       # Maximum discount percentage allowed
-        self.price_elasticity = -1.2   # Price elasticity of demand coefficient
     
     def optimize_price(self, product_id, store_id, demand_predictions):
         """
@@ -34,104 +32,206 @@ class PricingAgent:
         Returns:
             Dictionary with pricing recommendations
         """
-        logger.debug(f"Optimizing price for product {product_id} at store {store_id}")
-        
         try:
+            # Log action start
+            self.log_action(
+                action="optimize_price_start",
+                product_id=product_id,
+                store_id=store_id,
+                details={
+                    "prediction_count": len(demand_predictions) if demand_predictions else 0
+                }
+            )
+            
             # Get product details
             product = Product.query.get(product_id)
             if not product:
-                logger.warning(f"Product {product_id} not found")
-                return {"error": "Product not found"}
-            
-            base_price = product.base_price
+                logger.warning(f"Product not found with ID: {product_id}")
+                return {
+                    "error": "Product not found",
+                    "recommendation": "Unable to make pricing recommendation"
+                }
             
             # Get current inventory level
             inventory_record = InventoryRecord.query.filter_by(
-                product_id=product_id, 
+                product_id=product_id,
                 store_id=store_id
             ).first()
             
-            if not inventory_record:
-                logger.warning(f"No inventory record found for product {product_id} at store {store_id}")
-                return {"error": "No inventory record found"}
-            
-            current_stock = inventory_record.quantity
+            current_inventory = inventory_record.quantity if inventory_record else 0
             
             # Calculate total predicted demand
-            total_predicted_demand = sum(p['value'] for p in demand_predictions)
-            daily_avg_demand = total_predicted_demand / len(demand_predictions) if demand_predictions else 0
+            total_predicted_demand = sum(p.get('demand', 0) for p in demand_predictions)
+            avg_daily_demand = total_predicted_demand / len(demand_predictions) if demand_predictions else 0
             
-            # Determine inventory status (overstocked, understocked, or balanced)
-            days_of_supply = current_stock / daily_avg_demand if daily_avg_demand > 0 else 30
+            # Get base price from product
+            base_price = product.base_price
             
-            inventory_status = "balanced"
-            if days_of_supply > 45:  # More than 45 days of supply indicates overstocking
-                inventory_status = "overstocked"
-            elif days_of_supply < 15:  # Less than 15 days of supply indicates understocking
-                inventory_status = "understocked"
+            # Basic pricing logic - adjust based on inventory vs. demand
+            inventory_demand_ratio = current_inventory / max(1, avg_daily_demand * 7)  # Inventory vs. 7-day demand
             
-            # Calculate recommended price adjustment based on inventory status
-            price_adjustment = 0
-            
-            if inventory_status == "overstocked":
-                # Calculate discount based on how overstocked the item is
-                overstock_factor = min((days_of_supply - 30) / 30, 1.0)
-                price_adjustment = -self.max_discount * overstock_factor
-            elif inventory_status == "understocked":
-                # Calculate premium based on how understocked the item is
-                understock_factor = min((15 - days_of_supply) / 15, 1.0)
-                price_adjustment = 0.10 * understock_factor  # Add up to 10% premium
-            
-            # Ensure we maintain minimum profit margin
-            min_price = base_price * (1 + self.min_profit_margin)
-            max_price = base_price * 1.3  # Cap at 30% increase
+            # Default pricing strategy
+            if inventory_demand_ratio <= 0.5:  # Low inventory compared to demand
+                strategy = "PREMIUM"
+                price_adjustment = 1.15  # 15% markup
+                explanation = "Low inventory relative to demand suggests premium pricing to maximize margin."
+            elif inventory_demand_ratio <= 1.0:  # Balanced inventory and demand
+                strategy = "STANDARD"
+                price_adjustment = 1.0  # Standard price
+                explanation = "Balanced inventory and demand indicate maintaining standard pricing."
+            elif inventory_demand_ratio <= 2.0:  # Moderate excess inventory
+                strategy = "DISCOUNT"
+                price_adjustment = 0.9  # 10% discount
+                explanation = "Moderate excess inventory suggests a small discount to increase sales velocity."
+            else:  # Significant excess inventory
+                strategy = "CLEARANCE"
+                price_adjustment = 0.75  # 25% discount
+                explanation = "Significant excess inventory indicates need for clearance pricing to reduce stock."
             
             # Calculate recommended price
-            recommended_price = base_price * (1 + price_adjustment)
-            recommended_price = max(min_price, min(recommended_price, max_price))
+            recommended_price = round(base_price * price_adjustment, 2)
             
-            # Calculate expected demand impact
-            price_change_pct = price_adjustment
-            demand_impact_pct = price_change_pct * self.price_elasticity
-            new_expected_demand = daily_avg_demand * (1 + demand_impact_pct)
+            # Use LLM for enhanced pricing strategy if available
+            if self.llm and self.llm.check_ollama_available():
+                logger.info("Using LLM to enhance pricing recommendations")
+                
+                # Get additional market data if available
+                market_data = self._get_market_data(product)
+                
+                # Create context for LLM
+                context = {
+                    "product": {
+                        "id": product.id,
+                        "name": product.name,
+                        "category": product.category,
+                        "base_price": product.base_price
+                    },
+                    "inventory": {
+                        "current_quantity": current_inventory,
+                        "inventory_demand_ratio": inventory_demand_ratio
+                    },
+                    "demand": {
+                        "average_daily": avg_daily_demand,
+                        "total_predicted": total_predicted_demand,
+                        "days_forecasted": len(demand_predictions)
+                    },
+                    "pricing": {
+                        "base_price": base_price,
+                        "preliminary_strategy": strategy,
+                        "preliminary_price_adjustment": price_adjustment,
+                        "preliminary_recommended_price": recommended_price
+                    },
+                    "market_data": market_data
+                }
+                
+                # Prompt for LLM
+                prompt = f"""
+                Analyze optimal pricing strategy for product "{product.name}" with base price ${base_price}.
+                
+                Based on the provided context:
+                1. Evaluate if our preliminary pricing strategy is appropriate
+                2. Suggest an optimal price point considering inventory levels and demand
+                3. Recommend specific pricing actions (increase, maintain, discount)
+                4. Consider competitor pricing and market position if data available
+                
+                Return your analysis as a JSON object with these keys:
+                - "strategy": Overall pricing strategy (e.g., PREMIUM, STANDARD, DISCOUNT, CLEARANCE)
+                - "recommended_price": Specific price point recommendation (number)
+                - "price_adjustment": Multiplier applied to base price (e.g., 0.9 for 10% discount)
+                - "rationale": Brief explanation of your recommendation
+                - "actions": Array of specific actions to take
+                - "expected_impact": Anticipated effect on sales and revenue
+                
+                ONLY return the JSON object, nothing else.
+                """
+                
+                llm_response = self.analyze_with_llm(
+                    prompt=prompt,
+                    context=context,
+                    system_prompt="You are a pricing optimization expert. Provide data-driven pricing recommendations."
+                )
+                
+                # Parse JSON from LLM response
+                try:
+                    # Extract JSON object if embedded in other text
+                    import re
+                    json_match = re.search(r'\{.*\}', llm_response, re.DOTALL)
+                    if json_match:
+                        llm_json = json_match.group(0)
+                        enhanced_pricing = json.loads(llm_json)
+                        
+                        # Update from LLM recommendations if valid
+                        if 'recommended_price' in enhanced_pricing:
+                            try:
+                                llm_price = float(enhanced_pricing['recommended_price'])
+                                # Only accept if within reasonable range (50-200% of base price)
+                                if 0.5 * base_price <= llm_price <= 2.0 * base_price:
+                                    recommended_price = llm_price
+                                    price_adjustment = round(llm_price / base_price, 2)
+                            except (ValueError, TypeError):
+                                pass
+                                
+                        if 'strategy' in enhanced_pricing:
+                            strategy = enhanced_pricing['strategy']
+                            
+                        if 'rationale' in enhanced_pricing:
+                            explanation = enhanced_pricing['rationale']
+                    else:
+                        # Try to parse the whole response as JSON
+                        enhanced_pricing = json.loads(llm_response)
+                except Exception as e:
+                    logger.error(f"Failed to parse LLM pricing JSON: {str(e)}")
+                    enhanced_pricing = {}
+            else:
+                enhanced_pricing = {}
             
-            # Generate recommendation
+            # Build final recommendation
             recommendation = {
-                "base_price": round(base_price, 2),
-                "current_stock": current_stock,
-                "inventory_status": inventory_status,
-                "days_of_supply": round(days_of_supply, 1),
-                "price_adjustment_pct": round(price_adjustment * 100, 1),
-                "recommended_price": round(recommended_price, 2),
-                "expected_demand_change_pct": round(demand_impact_pct * 100, 1),
-                "original_daily_demand": round(daily_avg_demand, 2),
-                "new_expected_daily_demand": round(new_expected_demand, 2)
+                "product_id": product_id,
+                "store_id": store_id,
+                "base_price": base_price,
+                "recommended_price": recommended_price,
+                "price_adjustment": price_adjustment,
+                "strategy": strategy,
+                "explanation": explanation,
+                "timestamp": datetime.now().isoformat()
             }
             
-            # Log this action
-            store = Store.query.get(store_id)
+            # Add additional fields from LLM if available
+            if "actions" in enhanced_pricing:
+                recommendation["actions"] = enhanced_pricing["actions"]
+                
+            if "expected_impact" in enhanced_pricing:
+                recommendation["expected_impact"] = enhanced_pricing["expected_impact"]
             
-            action = AgentAction(
-                agent_type="pricing",
-                action="optimize_price",
+            # Log action completion
+            self.log_action(
+                action="optimize_price_complete",
                 product_id=product_id,
                 store_id=store_id,
-                details=json.dumps({
-                    "base_price": round(base_price, 2),
-                    "recommended_price": round(recommended_price, 2),
-                    "inventory_status": inventory_status,
-                    "product_name": product.name,
-                    "store_name": store.name if store else "Unknown"
-                })
+                details={
+                    "strategy": strategy,
+                    "recommended_price": recommended_price,
+                    "price_adjustment": price_adjustment
+                }
             )
-            db.session.add(action)
-            db.session.commit()
             
             return recommendation
             
         except Exception as e:
             logger.error(f"Error in price optimization: {str(e)}")
-            return {"error": str(e)}
+            self.log_action(
+                action="optimize_price_error",
+                product_id=product_id,
+                store_id=store_id,
+                details={
+                    "error": str(e)
+                }
+            )
+            return {
+                "error": str(e),
+                "recommendation": "Error occurred during price optimization"
+            }
     
     def apply_price_change(self, product_id, store_id, new_price):
         """
@@ -150,35 +250,111 @@ class PricingAgent:
             Boolean indicating success
         """
         try:
+            # Get product details
             product = Product.query.get(product_id)
-            store = Store.query.get(store_id)
-            
-            if not product or not store:
-                logger.warning(f"Product {product_id} or Store {store_id} not found")
+            if not product:
+                logger.warning(f"Product not found with ID: {product_id}")
                 return False
             
-            # Log the price change action
-            action = AgentAction(
-                agent_type="pricing",
+            # Calculate price adjustment
+            price_adjustment = round(new_price / product.base_price, 2)
+            
+            # Log action
+            self.log_action(
                 action="apply_price_change",
                 product_id=product_id,
                 store_id=store_id,
-                details=json.dumps({
-                    "old_price": product.base_price,
+                details={
+                    "base_price": product.base_price,
                     "new_price": new_price,
-                    "product_name": product.name,
-                    "store_name": store.name
-                })
+                    "price_adjustment": price_adjustment
+                }
             )
-            db.session.add(action)
             
-            # In a real system, we'd update the price in a pricing database
-            # For this demo, we'll just log the action
-            
-            db.session.commit()
+            # In a real system, this would update a pricing database
+            # For now, we'll just return success
             return True
-        
+            
         except Exception as e:
             logger.error(f"Error applying price change: {str(e)}")
-            db.session.rollback()
+            self.log_action(
+                action="apply_price_change_error",
+                product_id=product_id,
+                store_id=store_id,
+                details={
+                    "error": str(e),
+                    "attempted_price": new_price
+                }
+            )
             return False
+    
+    def _get_market_data(self, product):
+        """
+        Get market data for a product to inform pricing decisions.
+        
+        This would typically involve fetching competitor pricing, market trends, etc.
+        In this demo, we'll return simulated data or use the web scraper to get real data.
+        
+        Args:
+            product: Product object
+            
+        Returns:
+            Dictionary with market data
+        """
+        market_data = {
+            "average_market_price": None,
+            "price_range": None,
+            "competitor_prices": [],
+            "market_trends": [],
+            "source": "simulated"
+        }
+        
+        # Try to use web scraper to get real market data
+        if self.scraper:
+            try:
+                # Construct search query for product
+                search_term = f"{product.name} {product.category} price"
+                
+                # We could scrape e-commerce sites or price comparison sites
+                # For demo purposes, we'll just log the attempt
+                logger.info(f"Would search for market data with query: {search_term}")
+                
+                # In a real system, this might call an e-commerce API or scrape sites
+                # For now, we'll use simulated data
+            except Exception as e:
+                logger.error(f"Error fetching market data: {str(e)}")
+        
+        # Simulate market data based on product info
+        base_price = product.base_price
+        
+        # Simulate average market price (±15% of base price)
+        avg_market_price = round(base_price * random.uniform(0.85, 1.15), 2)
+        
+        # Simulate price range
+        price_range = {
+            "min": round(base_price * 0.7, 2),
+            "max": round(base_price * 1.3, 2)
+        }
+        
+        # Simulate competitor prices
+        competitor_prices = [
+            {"name": "Competitor A", "price": round(base_price * random.uniform(0.9, 1.1), 2)},
+            {"name": "Competitor B", "price": round(base_price * random.uniform(0.85, 1.2), 2)},
+            {"name": "Competitor C", "price": round(base_price * random.uniform(0.8, 1.3), 2)}
+        ]
+        
+        # Simulate market trends
+        market_trends = [
+            {"trend": "Seasonal demand increase" if random.random() > 0.5 else "Seasonal demand decrease"},
+            {"trend": "Price competition increasing" if random.random() > 0.5 else "Market prices stabilizing"}
+        ]
+        
+        # Update market data
+        market_data.update({
+            "average_market_price": avg_market_price,
+            "price_range": price_range,
+            "competitor_prices": competitor_prices,
+            "market_trends": market_trends
+        })
+        
+        return market_data

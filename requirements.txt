@@ -6,3 +6,12 @@ numpy
 pandas
 psycopg2-binary
 sqlalchemy
+trafilatura
+beautifulsoup4
+langchain
+ollama
+requests
+scikit-learn
+trafilatura
+langchain-community
+pandas

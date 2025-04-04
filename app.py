@@ -20,9 +20,8 @@ db = SQLAlchemy(model_class=Base)
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key")
 
-# Configure SQLite database
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///inventory_system.db"
-# SQLite doesn't need pool options but keeping them for future compatibility
+# Configure database
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
@@ -165,7 +164,7 @@ def register_routes(app):
                 product_id=product_id,
                 store_id=store_id,
                 prediction_days=days,
-                avg_predicted_demand=sum(p['value'] for p in predictions) / len(predictions) if predictions else 0,
+                avg_predicted_demand=sum(p['demand'] for p in predictions) / len(predictions) if predictions else 0,
                 timestamp=datetime.now()
             )
             db.session.add(log)

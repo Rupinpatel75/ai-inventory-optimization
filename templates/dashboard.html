@@ -1,95 +1,66 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
-{% block head %}
-<title>AI Inventory Optimization - Dashboard</title>
-{% endblock %}
+{% block title %}Dashboard - AI Inventory Optimization{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card bg-dark">
-            <div class="card-body">
-                <h1 class="card-title">
-                    <i class="fas fa-chart-line me-2"></i>
-                    Dashboard
-                </h1>
-                <p class="card-text">
-                    Comprehensive view of your inventory system with AI-powered insights, metrics, and visualizations.
-                </p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card bg-dark text-center h-100">
-            <div class="card-body">
-                <h5 class="card-title text-muted">Products</h5>
-                <h2 class="card-text" id="products-count">--</h2>
-                <i class="fas fa-box fa-2x text-primary"></i>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-dark text-center h-100">
-            <div class="card-body">
-                <h5 class="card-title text-muted">Stores</h5>
-                <h2 class="card-text" id="stores-count">--</h2>
-                <i class="fas fa-store fa-2x text-success"></i>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-dark text-center h-100">
-            <div class="card-body">
-                <h5 class="card-title text-muted">Total Inventory</h5>
-                <h2 class="card-text" id="total-inventory">--</h2>
-                <i class="fas fa-boxes fa-2x text-warning"></i>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-dark text-center h-100">
-            <div class="card-body">
-                <h5 class="card-title text-muted">AI Decisions</h5>
-                <h2 class="card-text" id="ai-decisions">--</h2>
-                <i class="fas fa-robot fa-2x text-info"></i>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card bg-dark">
-            <div class="card-header bg-primary">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h3 class="mb-0 text-white">Inventory Status</h3>
-                    <div>
-                        <select class="form-select form-select-sm" id="store-filter">
-                            <option value="all" selected>All Stores</option>
-                            {% for store in stores %}
-                            <option value="{{ store.id }}">{{ store.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Inventory Optimization Dashboard</h4>
+                <div>
+                    <button id="refreshButton" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5>Inventory Status Overview</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="inventoryStatusChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5>Demand Forecast (Next 30 Days)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="demandForecastChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Inventory Alerts</h5>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-dark table-hover">
+                    <table class="table table-hover">
                         <thead>
                             <tr>
                                 <th>Product</th>
-                                <th>Category</th>
                                 <th>Store</th>
-                                <th>Quantity</th>
                                 <th>Status</th>
-                                <th>Last Updated</th>
+                                <th>Current Quantity</th>
+                                <th>Recommended Order</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="inventory-table-body">
+                        <tbody id="inventoryAlertsTable">
                             <tr>
                                 <td colspan="6" class="text-center">Loading inventory data...</td>
                             </tr>
@@ -102,420 +73,464 @@
 </div>
 
 <div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card bg-dark h-100">
-            <div class="card-header bg-success text-white">
-                <h3 class="mb-0">Inventory by Category</h3>
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Pricing Recommendations</h5>
             </div>
             <div class="card-body">
-                <canvas id="category-chart" height="300"></canvas>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-6">
-        <div class="card bg-dark h-100">
-            <div class="card-header bg-warning text-dark">
-                <h3 class="mb-0">Inventory by Store</h3>
-            </div>
-            <div class="card-body">
-                <canvas id="store-chart" height="300"></canvas>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Store</th>
+                                <th>Base Price</th>
+                                <th>Recommended Price</th>
+                                <th>Strategy</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pricingRecommendationsTable">
+                            <tr>
+                                <td colspan="6" class="text-center">Loading pricing data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card bg-dark">
-            <div class="card-header bg-info text-white">
-                <h3 class="mb-0">Recent AI Agent Activities</h3>
+<!-- Modal for viewing recommendation details -->
+<div class="modal fade" id="recommendationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="recommendationModalTitle">Recommendation Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover">
-                        <thead>
-                            <tr>
-                                <th>Timestamp</th>
-                                <th>Agent</th>
-                                <th>Action</th>
-                                <th>Product</th>
-                                <th>Store</th>
-                                <th>Details</th>
-                            </tr>
-                        </thead>
-                        <tbody id="agent-logs-body">
-                            <tr>
-                                <td colspan="6" class="text-center">Loading agent activities...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="text-end">
-                    <a href="/logs" class="btn btn-outline-info btn-sm">View All Logs</a>
-                </div>
+            <div class="modal-body" id="recommendationModalBody">
+                <!-- Content will be dynamically inserted -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
-{% block scripts %}
-<script src="{{ url_for('static', filename='js/chart_utils.js') }}"></script>
+{% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize charts
-    let categoryChart = null;
-    let storeChart = null;
+    // Charts
+    let inventoryStatusChart = null;
+    let demandForecastChart = null;
     
-    // Load initial data
-    loadDashboardData();
-    loadInventoryData();
-    loadAgentLogs();
+    // Data storage
+    let productsMap = {};
+    let storesMap = {};
+    let inventoryData = [];
+    let inventoryRecommendations = [];
+    let pricingRecommendations = [];
     
-    // Add event listener for store filter
-    document.getElementById('store-filter').addEventListener('change', function() {
-        loadInventoryData(this.value);
+    // Initialize data and charts on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Fetch products and stores for lookup
+        Promise.all([
+            fetch('/api/products').then(response => response.json()),
+            fetch('/api/stores').then(response => response.json())
+        ])
+        .then(([productsResponse, storesResponse]) => {
+            if (productsResponse.success && storesResponse.success) {
+                // Create lookup maps
+                productsResponse.products.forEach(product => {
+                    productsMap[product.id] = product;
+                });
+                
+                storesResponse.stores.forEach(store => {
+                    storesMap[store.id] = store;
+                });
+                
+                // Load dashboard data
+                loadDashboardData();
+            }
+        })
+        .catch(error => {
+            console.error('Error loading initial data:', error);
+        });
+        
+        // Set up refresh button
+        document.getElementById('refreshButton').addEventListener('click', loadDashboardData);
     });
     
-    // Function to load dashboard overview data
     function loadDashboardData() {
-        // Load products count
-        fetch('/api/products')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('products-count').textContent = data.products.length;
-                }
-            })
-            .catch(error => console.error('Error fetching products:', error));
-            
-        // Load stores count
-        fetch('/api/stores')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('stores-count').textContent = data.stores.length;
-                }
-            })
-            .catch(error => console.error('Error fetching stores:', error));
-            
+        // Show loading state
+        document.getElementById('inventoryAlertsTable').innerHTML = '<tr><td colspan="6" class="text-center">Loading inventory data...</td></tr>';
+        document.getElementById('pricingRecommendationsTable').innerHTML = '<tr><td colspan="6" class="text-center">Loading pricing data...</td></tr>';
+        
         // Load inventory data
         fetch('/api/inventory')
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Calculate total inventory
-                    const totalInventory = data.inventory.reduce((total, item) => total + item.quantity, 0);
-                    document.getElementById('total-inventory').textContent = totalInventory;
+                    inventoryData = data.inventory;
                     
-                    // Create category chart
-                    createCategoryChart(data.inventory);
+                    // Generate recommendations for all products
+                    const recommendationPromises = [];
                     
-                    // Create store chart
-                    createStoreChart(data.inventory);
+                    // Only process the first 5 items to avoid overloading the system
+                    const processItems = inventoryData.slice(0, 5);
+                    
+                    processItems.forEach(item => {
+                        recommendationPromises.push(
+                            fetch('/api/predict', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    product_id: item.product_id,
+                                    store_id: item.store_id,
+                                    days: 30
+                                })
+                            })
+                            .then(response => response.json())
+                        );
+                    });
+                    
+                    Promise.all(recommendationPromises)
+                        .then(recommendations => {
+                            // Process successful recommendations
+                            const successfulRecommendations = recommendations.filter(rec => rec.success);
+                            
+                            // Extract inventory and pricing recommendations
+                            inventoryRecommendations = successfulRecommendations.map(rec => {
+                                return {
+                                    product_id: rec.inventory_recommendation.product_id,
+                                    store_id: rec.inventory_recommendation.store_id,
+                                    ...rec.inventory_recommendation
+                                };
+                            });
+                            
+                            pricingRecommendations = successfulRecommendations.map(rec => {
+                                return {
+                                    product_id: rec.pricing_recommendation.product_id,
+                                    store_id: rec.pricing_recommendation.store_id,
+                                    ...rec.pricing_recommendation
+                                };
+                            });
+                            
+                            // Update inventory alerts table
+                            updateInventoryAlertsTable();
+                            
+                            // Update pricing recommendations table
+                            updatePricingRecommendationsTable();
+                            
+                            // Update charts
+                            updateInventoryStatusChart();
+                            updateDemandForecastChart(successfulRecommendations);
+                        })
+                        .catch(error => {
+                            console.error('Error generating recommendations:', error);
+                        });
                 }
             })
-            .catch(error => console.error('Error fetching inventory:', error));
+            .catch(error => {
+                console.error('Error loading inventory data:', error);
+            });
+    }
+    
+    function updateInventoryAlertsTable() {
+        const tableBody = document.getElementById('inventoryAlertsTable');
+        
+        if (inventoryRecommendations.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No inventory alerts available</td></tr>';
+            return;
+        }
+        
+        let tableHtml = '';
+        
+        inventoryRecommendations.forEach(rec => {
+            const product = productsMap[rec.product_id] || { name: 'Unknown' };
+            const store = storesMap[rec.store_id] || { name: 'Unknown' };
             
-        // Load agent logs count
-        fetch('/api/logs?limit=1000')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('ai-decisions').textContent = data.logs.length;
-                }
-            })
-            .catch(error => console.error('Error fetching logs:', error));
-    }
-    
-    // Function to load inventory table data
-    function loadInventoryData(storeId = 'all') {
-        fetch('/api/inventory')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const tableBody = document.getElementById('inventory-table-body');
-                    let inventoryData = data.inventory;
-                    
-                    // Filter by store if needed
-                    if (storeId !== 'all') {
-                        inventoryData = inventoryData.filter(item => item.store_id == storeId);
-                    }
-                    
-                    // Clear table
-                    tableBody.innerHTML = '';
-                    
-                    if (inventoryData.length === 0) {
-                        tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No inventory data available</td></tr>';
-                        return;
-                    }
-                    
-                    // Add rows
-                    inventoryData.forEach(item => {
-                        const row = document.createElement('tr');
-                        
-                        // Calculate inventory status
-                        let status = 'Normal';
-                        let statusClass = 'bg-success';
-                        
-                        if (item.quantity <= 10) {
-                            status = 'Low';
-                            statusClass = 'bg-danger';
-                        } else if (item.quantity <= 25) {
-                            status = 'Warning';
-                            statusClass = 'bg-warning text-dark';
-                        } else if (item.quantity >= 80) {
-                            status = 'Overstocked';
-                            statusClass = 'bg-info';
-                        }
-                        
-                        // Format date
-                        const lastUpdated = new Date(item.last_updated);
-                        const formattedDate = lastUpdated.toLocaleString();
-                        
-                        row.innerHTML = `
-                            <td>${item.product_name}</td>
-                            <td>${getProductCategory(item.product_id)}</td>
-                            <td>${item.store_name}</td>
-                            <td>${item.quantity}</td>
-                            <td><span class="badge ${statusClass}">${status}</span></td>
-                            <td>${formattedDate}</td>
-                        `;
-                        
-                        tableBody.appendChild(row);
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching inventory:', error);
-                const tableBody = document.getElementById('inventory-table-body');
-                tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading inventory data</td></tr>';
-            });
-    }
-    
-    // Function to load agent logs
-    function loadAgentLogs() {
-        fetch('/api/logs?limit=5')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const tableBody = document.getElementById('agent-logs-body');
-                    
-                    // Clear table
-                    tableBody.innerHTML = '';
-                    
-                    if (data.logs.length === 0) {
-                        tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No agent logs available</td></tr>';
-                        return;
-                    }
-                    
-                    // Add rows
-                    data.logs.forEach(log => {
-                        const row = document.createElement('tr');
-                        
-                        // Format date
-                        const timestamp = new Date(log.timestamp);
-                        const formattedDate = timestamp.toLocaleString();
-                        
-                        // Format agent type
-                        let agentClass = '';
-                        switch (log.agent_type) {
-                            case 'demand':
-                                agentClass = 'text-primary';
-                                break;
-                            case 'inventory':
-                                agentClass = 'text-success';
-                                break;
-                            case 'pricing':
-                                agentClass = 'text-warning';
-                                break;
-                        }
-                        
-                        // Format details
-                        let details = '';
-                        if (log.details) {
-                            try {
-                                const detailsObj = JSON.parse(log.details);
-                                details = Object.entries(detailsObj)
-                                    .filter(([key]) => key !== 'product_name' && key !== 'store_name')
-                                    .map(([key, value]) => `${key}: ${value}`)
-                                    .join(', ');
-                            } catch (e) {
-                                details = log.details;
-                            }
-                        }
-                        
-                        row.innerHTML = `
-                            <td>${formattedDate}</td>
-                            <td class="${agentClass}">${log.agent_type.charAt(0).toUpperCase() + log.agent_type.slice(1)} Agent</td>
-                            <td>${log.action}</td>
-                            <td>${log.product_name || '-'}</td>
-                            <td>${log.store_name || '-'}</td>
-                            <td>${details}</td>
-                        `;
-                        
-                        tableBody.appendChild(row);
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching logs:', error);
-                const tableBody = document.getElementById('agent-logs-body');
-                tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading agent logs</td></tr>';
-            });
-    }
-    
-    // Create category chart
-    function createCategoryChart(inventoryData) {
-        const ctx = document.getElementById('category-chart').getContext('2d');
-        
-        // Group data by category
-        const categoryMap = {};
-        
-        inventoryData.forEach(item => {
-            const category = getProductCategory(item.product_id);
-            if (!categoryMap[category]) {
-                categoryMap[category] = 0;
-            }
-            categoryMap[category] += item.quantity;
+            tableHtml += `
+                <tr>
+                    <td>${product.name}</td>
+                    <td>${store.name}</td>
+                    <td><span class="badge text-bg-${getStatusBadgeClass(rec.status)}">${rec.status}</span></td>
+                    <td>${rec.current_quantity}</td>
+                    <td>${rec.recommended_order}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-info" 
+                                onclick="showInventoryRecommendation(${rec.product_id}, ${rec.store_id})">
+                            Details
+                        </button>
+                    </td>
+                </tr>
+            `;
         });
         
-        // Prepare chart data
-        const categories = Object.keys(categoryMap);
-        const quantities = Object.values(categoryMap);
+        tableBody.innerHTML = tableHtml;
+    }
+    
+    function updatePricingRecommendationsTable() {
+        const tableBody = document.getElementById('pricingRecommendationsTable');
         
-        // Destroy previous chart if it exists
-        if (categoryChart) {
-            categoryChart.destroy();
+        if (pricingRecommendations.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No pricing recommendations available</td></tr>';
+            return;
         }
         
-        // Create new chart
-        categoryChart = new Chart(ctx, {
-            type: 'pie',
-            data: {
-                labels: categories,
-                datasets: [{
-                    data: quantities,
-                    backgroundColor: [
-                        'rgba(75, 192, 192, 0.7)',
-                        'rgba(153, 102, 255, 0.7)',
-                        'rgba(255, 159, 64, 0.7)',
-                        'rgba(54, 162, 235, 0.7)',
-                        'rgba(255, 99, 132, 0.7)',
-                        'rgba(255, 206, 86, 0.7)'
-                    ],
-                    borderColor: [
-                        'rgba(75, 192, 192, 1)',
-                        'rgba(153, 102, 255, 1)',
-                        'rgba(255, 159, 64, 1)',
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(255, 206, 86, 1)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'right',
-                    },
-                    title: {
-                        display: true,
-                        text: 'Inventory by Product Category'
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const label = context.label || '';
-                                const value = context.raw || 0;
-                                const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-                                const percentage = Math.round((value / total) * 100);
-                                return `${label}: ${value} units (${percentage}%)`;
-                            }
-                        }
-                    }
-                }
-            }
+        let tableHtml = '';
+        
+        pricingRecommendations.forEach(rec => {
+            const product = productsMap[rec.product_id] || { name: 'Unknown' };
+            const store = storesMap[rec.store_id] || { name: 'Unknown' };
+            
+            tableHtml += `
+                <tr>
+                    <td>${product.name}</td>
+                    <td>${store.name}</td>
+                    <td>$${rec.base_price.toFixed(2)}</td>
+                    <td>$${rec.recommended_price.toFixed(2)}</td>
+                    <td><span class="badge text-bg-${getStrategyBadgeClass(rec.strategy)}">${rec.strategy}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-info" 
+                                onclick="showPricingRecommendation(${rec.product_id}, ${rec.store_id})">
+                            Details
+                        </button>
+                    </td>
+                </tr>
+            `;
         });
+        
+        tableBody.innerHTML = tableHtml;
     }
     
-    // Create store chart
-    function createStoreChart(inventoryData) {
-        const ctx = document.getElementById('store-chart').getContext('2d');
-        
-        // Group data by store
-        const storeMap = {};
-        
-        inventoryData.forEach(item => {
-            if (!storeMap[item.store_name]) {
-                storeMap[item.store_name] = 0;
-            }
-            storeMap[item.store_name] += item.quantity;
-        });
-        
-        // Prepare chart data
-        const stores = Object.keys(storeMap);
-        const quantities = Object.values(storeMap);
-        
-        // Destroy previous chart if it exists
-        if (storeChart) {
-            storeChart.destroy();
-        }
-        
-        // Create new chart
-        storeChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: stores,
-                datasets: [{
-                    label: 'Total Inventory',
-                    data: quantities,
-                    backgroundColor: 'rgba(255, 193, 7, 0.7)',
-                    borderColor: 'rgba(255, 193, 7, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Units'
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    title: {
-                        display: true,
-                        text: 'Inventory by Store Location'
-                    }
-                }
-            }
-        });
-    }
-    
-    // Helper function to get product category
-    function getProductCategory(productId) {
-        // This is a simple implementation - in a real application, you'd fetch this from the server
-        // or maintain a local cache of product data
-        const productCategories = {
-            1: 'Electronics',
-            2: 'Electronics',
-            3: 'Electronics',
-            4: 'Clothing',
-            5: 'Clothing'
+    function updateInventoryStatusChart() {
+        // Count inventory by status
+        const statusCounts = {
+            'OUT_OF_STOCK': 0,
+            'LOW_STOCK': 0,
+            'ADEQUATE': 0,
+            'OVERSTOCKED': 0
         };
         
-        return productCategories[productId] || 'Unknown';
+        inventoryRecommendations.forEach(rec => {
+            if (statusCounts.hasOwnProperty(rec.status)) {
+                statusCounts[rec.status]++;
+            }
+        });
+        
+        // Create or update chart
+        const ctx = document.getElementById('inventoryStatusChart').getContext('2d');
+        
+        if (inventoryStatusChart) {
+            inventoryStatusChart.destroy();
+        }
+        
+        inventoryStatusChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(statusCounts),
+                datasets: [{
+                    data: Object.values(statusCounts),
+                    backgroundColor: [
+                        'rgba(220, 53, 69, 0.8)',   // OUT_OF_STOCK - Danger
+                        'rgba(255, 193, 7, 0.8)',   // LOW_STOCK - Warning
+                        'rgba(40, 167, 69, 0.8)',   // ADEQUATE - Success
+                        'rgba(23, 162, 184, 0.8)'   // OVERSTOCKED - Info
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
     }
-});
+    
+    function updateDemandForecastChart(recommendations) {
+        // Use the first recommendation's predictions for the chart
+        if (recommendations.length === 0 || !recommendations[0].predictions) {
+            return;
+        }
+        
+        const predictions = recommendations[0].predictions;
+        const dates = predictions.map(p => p.date);
+        const demands = predictions.map(p => p.demand);
+        
+        // Create or update chart
+        const ctx = document.getElementById('demandForecastChart').getContext('2d');
+        
+        if (demandForecastChart) {
+            demandForecastChart.destroy();
+        }
+        
+        demandForecastChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'Predicted Demand',
+                    data: demands,
+                    borderColor: 'rgba(0, 123, 255, 1)',
+                    backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                    borderWidth: 2,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+    
+    function showInventoryRecommendation(productId, storeId) {
+        const recommendation = inventoryRecommendations.find(
+            rec => rec.product_id === productId && rec.store_id === storeId
+        );
+        
+        if (!recommendation) {
+            return;
+        }
+        
+        const product = productsMap[productId] || { name: 'Unknown' };
+        const store = storesMap[storeId] || { name: 'Unknown' };
+        
+        // Build modal content
+        const modalTitle = document.getElementById('recommendationModalTitle');
+        const modalBody = document.getElementById('recommendationModalBody');
+        
+        modalTitle.textContent = `Inventory Recommendation for ${product.name} at ${store.name}`;
+        
+        let content = `
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h6>Status: <span class="badge text-bg-${getStatusBadgeClass(recommendation.status)}">${recommendation.status}</span></h6>
+                    <p><strong>Current Quantity:</strong> ${recommendation.current_quantity} units</p>
+                    <p><strong>Recommended Order:</strong> ${recommendation.recommended_order} units</p>
+                    <p><strong>Total Predicted Demand:</strong> ${recommendation.total_predicted_demand.toFixed(1)} units</p>
+                    <p><strong>Average Daily Demand:</strong> ${recommendation.average_daily_demand.toFixed(1)} units/day</p>
+                    <p><strong>Reasoning:</strong> ${recommendation.reasoning}</p>
+                </div>
+            </div>
+        `;
+        
+        // Add actions if available
+        if (recommendation.actions && recommendation.actions.length > 0) {
+            content += `
+                <h6>Recommended Actions:</h6>
+                <ul class="list-group mb-3">
+                    ${recommendation.actions.map(action => `<li class="list-group-item">${action}</li>`).join('')}
+                </ul>
+            `;
+        }
+        
+        // Add risks if available
+        if (recommendation.risks && recommendation.risks.length > 0) {
+            content += `
+                <h6>Risks:</h6>
+                <ul class="list-group">
+                    ${recommendation.risks.map(risk => `<li class="list-group-item">${risk}</li>`).join('')}
+                </ul>
+            `;
+        }
+        
+        modalBody.innerHTML = content;
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('recommendationModal'));
+        modal.show();
+    }
+    
+    function showPricingRecommendation(productId, storeId) {
+        const recommendation = pricingRecommendations.find(
+            rec => rec.product_id === productId && rec.store_id === storeId
+        );
+        
+        if (!recommendation) {
+            return;
+        }
+        
+        const product = productsMap[productId] || { name: 'Unknown' };
+        const store = storesMap[storeId] || { name: 'Unknown' };
+        
+        // Build modal content
+        const modalTitle = document.getElementById('recommendationModalTitle');
+        const modalBody = document.getElementById('recommendationModalBody');
+        
+        modalTitle.textContent = `Pricing Recommendation for ${product.name} at ${store.name}`;
+        
+        let content = `
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h6>Strategy: <span class="badge text-bg-${getStrategyBadgeClass(recommendation.strategy)}">${recommendation.strategy}</span></h6>
+                    <p><strong>Base Price:</strong> $${recommendation.base_price.toFixed(2)}</p>
+                    <p><strong>Recommended Price:</strong> $${recommendation.recommended_price.toFixed(2)}</p>
+                    <p><strong>Price Adjustment:</strong> ${Math.round((recommendation.price_adjustment - 1) * 100)}%</p>
+                    <p><strong>Explanation:</strong> ${recommendation.explanation}</p>
+                </div>
+            </div>
+        `;
+        
+        // Add actions if available
+        if (recommendation.actions && recommendation.actions.length > 0) {
+            content += `
+                <h6>Recommended Actions:</h6>
+                <ul class="list-group mb-3">
+                    ${recommendation.actions.map(action => `<li class="list-group-item">${action}</li>`).join('')}
+                </ul>
+            `;
+        }
+        
+        // Add expected impact if available
+        if (recommendation.expected_impact) {
+            content += `
+                <h6>Expected Impact:</h6>
+                <div class="alert alert-info">
+                    ${recommendation.expected_impact}
+                </div>
+            `;
+        }
+        
+        modalBody.innerHTML = content;
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('recommendationModal'));
+        modal.show();
+    }
+    
+    // Helper functions for badge colors
+    function getStatusBadgeClass(status) {
+        status = status.toUpperCase();
+        if (status === 'OUT_OF_STOCK') return 'danger';
+        if (status === 'LOW_STOCK') return 'warning';
+        if (status === 'ADEQUATE') return 'success';
+        if (status === 'OVERSTOCKED') return 'info';
+        return 'secondary';
+    }
+
+    function getStrategyBadgeClass(strategy) {
+        strategy = strategy.toUpperCase();
+        if (strategy === 'PREMIUM') return 'info';
+        if (strategy === 'STANDARD') return 'primary';
+        if (strategy === 'DISCOUNT') return 'warning';
+        if (strategy === 'CLEARANCE') return 'danger';
+        return 'secondary';
+    }
 </script>
 {% endblock %}

@@ -2,18 +2,12 @@ from flask import render_template, request, jsonify, redirect, url_for
 from models import Product, Store, InventoryRecord, PredictionLog, AgentAction
 from app import db
 from utils.forecasting import load_forecast_model, predict_demand
-from agents.demand_agent import DemandAgent
-from agents.inventory_agent import InventoryAgent
-from agents.pricing_agent import PricingAgent
+from agents import demand_agent, inventory_agent, pricing_agent
 from datetime import datetime
 import logging
+import json
 
 logger = logging.getLogger(__name__)
-
-# Initialize agents
-demand_agent = DemandAgent()
-inventory_agent = InventoryAgent()
-pricing_agent = PricingAgent()
 
 def register_routes(app):
     @app.route('/')
@@ -33,9 +27,8 @@ def register_routes(app):
     @app.route('/logs')
     def logs():
         """View showing agent activity logs."""
-        products = Product.query.all()
-        stores = Store.query.all()
-        return render_template('logs.html', products=products, stores=stores)
+        logs = AgentAction.query.order_by(AgentAction.timestamp.desc()).limit(100).all()
+        return render_template('logs.html', logs=logs)
     
     @app.route('/api/predict', methods=['POST'])
     def predict_endpoint():
@@ -60,7 +53,7 @@ def register_routes(app):
                 product_id=product_id,
                 store_id=store_id,
                 prediction_days=days,
-                avg_predicted_demand=sum(p['value'] for p in predictions) / len(predictions) if predictions else 0,
+                avg_predicted_demand=sum(p['demand'] for p in predictions) / len(predictions) if predictions else 0,
                 timestamp=datetime.now()
             )
             db.session.add(log)
@@ -116,13 +109,10 @@ def register_routes(app):
         """Get agent action logs."""
         limit = int(request.args.get('limit', 20))
         agent_type = request.args.get('agent_type')
-        product_id = request.args.get('product_id')
         
         query = AgentAction.query
         if agent_type:
             query = query.filter_by(agent_type=agent_type)
-        if product_id:
-            query = query.filter_by(product_id=product_id)
         
         logs = query.order_by(AgentAction.timestamp.desc()).limit(limit).all()
         result = []
@@ -130,6 +120,14 @@ def register_routes(app):
         for log in logs:
             product = Product.query.get(log.product_id) if log.product_id else None
             store = Store.query.get(log.store_id) if log.store_id else None
+            
+            # Parse JSON details if present
+            details = None
+            if log.details:
+                try:
+                    details = json.loads(log.details)
+                except:
+                    details = log.details
             
             result.append({
                 'id': log.id,
@@ -139,7 +137,7 @@ def register_routes(app):
                 'product_name': product.name if product else None,
                 'store_id': log.store_id,
                 'store_name': store.name if store else None,
-                'details': log.details,
+                'details': details,
                 'timestamp': log.timestamp.isoformat()
             })
         
@@ -182,3 +180,113 @@ def register_routes(app):
             'success': True,
             'stores': result
         })
+        
+    @app.route('/api/llm-status', methods=['GET'])
+    def get_llm_status():
+        """Check if LLM is available and working."""
+        from utils.llm_integration import llm_manager
+        
+        llm_available = False
+        llm_message = "LLM not initialized"
+        
+        if llm_manager:
+            llm_available = llm_manager.check_ollama_available()
+            llm_message = "LLM available and responding" if llm_available else "LLM not available"
+        
+        return jsonify({
+            'success': True,
+            'llm_available': llm_available,
+            'message': llm_message
+        })
+        
+    @app.route('/api/web-scraper-test', methods=['POST'])
+    def test_web_scraper():
+        """Test the web scraper with a URL."""
+        from utils.web_scraper import scraper
+        
+        try:
+            data = request.json
+            url = data.get('url')
+            
+            if not url:
+                return jsonify({
+                    'success': False,
+                    'error': 'No URL provided'
+                }), 400
+                
+            # Extract text content
+            text_content = scraper.extract_text_content(url)
+            
+            # Limit response size
+            max_length = 1000
+            if len(text_content) > max_length:
+                text_content = text_content[:max_length] + "... (truncated)"
+            
+            return jsonify({
+                'success': True,
+                'url': url,
+                'content_length': len(text_content),
+                'content_preview': text_content
+            })
+        except Exception as e:
+            logger.error(f"Web scraper test error: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+            
+    @app.route('/api/agent-test/<agent_type>', methods=['POST'])
+    def test_agent(agent_type):
+        """Test a specific agent with sample data."""
+        try:
+            from agents import get_agent
+            
+            data = request.json
+            product_id = data.get('product_id', 1)
+            store_id = data.get('store_id', 1)
+            
+            # Get the agent
+            try:
+                agent = get_agent(agent_type)
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'error': f"Unknown agent type: {agent_type}"
+                }), 400
+            
+            result = {}
+            
+            # Test different agent types
+            if agent_type == 'demand':
+                predictions = agent.predict_demand(product_id, store_id, days=7)
+                result = {
+                    'agent_type': agent_type,
+                    'predictions': predictions
+                }
+            elif agent_type == 'inventory':
+                # First get demand predictions
+                demand_predictions = demand_agent.predict_demand(product_id, store_id, days=7)
+                recommendation = agent.optimize_inventory(product_id, store_id, demand_predictions)
+                result = {
+                    'agent_type': agent_type,
+                    'recommendation': recommendation
+                }
+            elif agent_type == 'pricing':
+                # First get demand predictions
+                demand_predictions = demand_agent.predict_demand(product_id, store_id, days=7)
+                recommendation = agent.optimize_price(product_id, store_id, demand_predictions)
+                result = {
+                    'agent_type': agent_type,
+                    'recommendation': recommendation
+                }
+            
+            return jsonify({
+                'success': True,
+                'result': result
+            })
+        except Exception as e:
+            logger.error(f"Agent test error: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500

@@ -1,23 +1,24 @@
 import logging
 import json
 import random
-import numpy as np
+from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
-from utils.forecasting import load_forecast_model, predict_demand
+
+from agents.base_agent import BaseAgent
+from models import PredictionLog
 from app import db
-from models import AgentAction, Product, Store, InventoryRecord
+from utils.forecasting import predict_demand as forecast_demand
 
 logger = logging.getLogger(__name__)
 
-class DemandAgent:
+class DemandAgent(BaseAgent):
     """
     Agent responsible for predicting future demand based on historical data.
     Uses Prophet forecasting model to make predictions.
     """
     
     def __init__(self):
-        self.name = "Demand Agent"
-        self.forecast_model = None
+        super().__init__("Demand Agent", "demand")
         logger.info("Demand Agent initialized")
     
     def predict_demand(self, product_id, store_id, days=30):
@@ -32,41 +33,124 @@ class DemandAgent:
         Returns:
             List of dictionaries with date and predicted demand value
         """
-        logger.debug(f"Predicting demand for product {product_id} at store {store_id} for {days} days")
-        
         try:
-            # Try to load the forecast model if not already loaded
-            if self.forecast_model is None:
-                self.forecast_model = load_forecast_model()
-            
-            # Get predictions from Prophet model
-            predictions = predict_demand(self.forecast_model, product_id, store_id, days)
-            
-            # Log this action
-            product = Product.query.get(product_id)
-            store = Store.query.get(store_id)
-            
-            action = AgentAction(
-                agent_type="demand",
-                action="predict_demand",
+            # Log action start
+            self.log_action(
+                action="predict_demand_start",
                 product_id=product_id,
                 store_id=store_id,
-                details=json.dumps({
-                    "days": days,
-                    "avg_prediction": sum(p['value'] for p in predictions) / len(predictions) if predictions else 0,
-                    "product_name": product.name if product else "Unknown",
-                    "store_name": store.name if store else "Unknown"
-                })
+                details={
+                    "prediction_days": days
+                }
             )
-            db.session.add(action)
+            
+            # Get predictions from the forecasting model
+            # In a production system, this would use a trained model
+            # For now, we'll use the utility function that might use a model or fallback
+            logger.info(f"Getting demand predictions for product {product_id} at store {store_id}")
+            
+            # Try to get predictions from forecasting utility
+            predictions = forecast_demand(None, product_id, store_id, days)
+            
+            # If forecasting failed or returned empty, try to use LLM augmentation
+            if not predictions and self.llm and self.llm.check_ollama_available():
+                logger.info("Using LLM to augment demand prediction")
+                
+                # Create a context for the LLM
+                context = {
+                    "product_id": product_id,
+                    "store_id": store_id,
+                    "days": days,
+                    "current_date": datetime.now().strftime("%Y-%m-%d")
+                }
+                
+                # Ask LLM for insights
+                prompt = f"""
+                Based on available data, provide reasonable demand predictions for product ID {product_id} 
+                at store ID {store_id} for the next {days} days. 
+                
+                Consider:
+                1. If it's a seasonal product
+                2. General market trends
+                3. Day of week effects
+                4. Recent demand patterns
+                
+                Return a JSON array with daily predictions in this format:
+                [
+                  {{"date": "YYYY-MM-DD", "demand": numeric_value}},
+                  ...
+                ]
+                
+                ONLY return the JSON array, nothing else.
+                """
+                
+                llm_response = self.analyze_with_llm(
+                    prompt=prompt,
+                    context=context,
+                    system_prompt="You are a demand forecasting expert. Provide realistic demand predictions based on product and store context."
+                )
+                
+                # Parse JSON from LLM response
+                try:
+                    # Extract JSON array if embedded in other text
+                    import re
+                    json_match = re.search(r'\[\s*\{.*\}\s*\]', llm_response, re.DOTALL)
+                    if json_match:
+                        llm_json = json_match.group(0)
+                        llm_predictions = json.loads(llm_json)
+                        predictions = llm_predictions
+                    else:
+                        # Try to parse the whole response as JSON
+                        predictions = json.loads(llm_response)
+                except Exception as e:
+                    logger.error(f"Failed to parse LLM prediction JSON: {str(e)}")
+                    # Fallback to simulated predictions
+                    predictions = self._simulate_predictions(product_id, store_id, days)
+            elif not predictions:
+                # If forecasting failed and LLM is not available, use simulated data
+                logger.warning("Forecasting failed and LLM not available, using simulated predictions")
+                predictions = self._simulate_predictions(product_id, store_id, days)
+            
+            # Calculate average predicted demand
+            total_demand = sum(p.get('demand', 0) for p in predictions)
+            avg_demand = total_demand / len(predictions) if predictions else 0
+            
+            # Log the prediction to the database
+            prediction_log = PredictionLog(
+                product_id=product_id,
+                store_id=store_id,
+                prediction_days=days,
+                avg_predicted_demand=avg_demand,
+                timestamp=datetime.now()
+            )
+            db.session.add(prediction_log)
             db.session.commit()
+            
+            # Log action completion
+            self.log_action(
+                action="predict_demand_complete",
+                product_id=product_id,
+                store_id=store_id,
+                details={
+                    "prediction_days": days,
+                    "avg_predicted_demand": avg_demand,
+                    "predictions_count": len(predictions)
+                }
+            )
             
             return predictions
             
         except Exception as e:
             logger.error(f"Error in demand prediction: {str(e)}")
-            # If model fails, fall back to simulated predictions
-            return self._simulate_predictions(product_id, store_id, days)
+            self.log_action(
+                action="predict_demand_error",
+                product_id=product_id,
+                store_id=store_id,
+                details={
+                    "error": str(e)
+                }
+            )
+            return []
     
     def _simulate_predictions(self, product_id, store_id, days):
         """
@@ -75,42 +159,33 @@ class DemandAgent:
         This is a fallback method only used when the actual forecasting model
         isn't available or fails.
         """
-        logger.warning("Using simulated predictions as fallback")
-        
-        # Get current inventory as baseline
-        inventory_record = InventoryRecord.query.filter_by(
-            product_id=product_id, 
-            store_id=store_id
-        ).first()
-        
-        baseline = 10  # Default baseline
-        if inventory_record:
-            # Use current inventory to estimate reasonable demand
-            baseline = max(5, inventory_record.quantity * 0.1)
-        
-        # Generate simulated predictions
-        start_date = datetime.now()
         predictions = []
+        base_demand = random.randint(5, 20)  # Random base demand between 5-20 units
         
-        for i in range(days):
-            current_date = start_date + timedelta(days=i)
+        # Add some product-specific variation
+        product_factor = (product_id % 5) + 0.8  # 0.8-4.8 range
+        
+        # Add some store-specific variation
+        store_factor = (store_id % 3) + 0.9  # 0.9-2.9 range
+        
+        today = datetime.now()
+        
+        for day in range(days):
+            date = today + timedelta(days=day)
             
-            # Add some randomness and a slight trend
-            trend_factor = 1.0 + (i * 0.01)  # Slight upward trend
+            # Day of week factor (weekend boost)
+            weekday = date.weekday()
+            day_factor = 1.3 if weekday >= 5 else 1.0  # Weekend boost
             
-            # Weekend effect (higher demand on weekends)
-            day_of_week = current_date.weekday()
-            weekend_factor = 1.3 if day_of_week >= 5 else 1.0
+            # Add some randomness
+            random_factor = random.uniform(0.8, 1.2)
             
-            # Randomness factor
-            random_factor = random.uniform(0.85, 1.15)
-            
-            # Calculate predicted value
-            value = baseline * trend_factor * weekend_factor * random_factor
+            # Calculate demand
+            demand = round(base_demand * product_factor * store_factor * day_factor * random_factor)
             
             predictions.append({
-                'date': current_date.strftime('%Y-%m-%d'),
-                'value': round(value, 2)
+                'date': date.strftime('%Y-%m-%d'),
+                'demand': demand
             })
         
         return predictions

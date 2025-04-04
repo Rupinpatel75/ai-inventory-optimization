@@ -1,156 +1,190 @@
 /**
- * Main JavaScript file for the AI Inventory Optimization System
- * Contains global utility functions and initialization code
+ * Main JavaScript for AI Inventory Optimization System
  */
 
-// Wait for DOM to be fully loaded
+// Global state for the application
+const appState = {
+    products: [],
+    stores: [],
+    llmAvailable: false,
+};
+
+// Initialize the application when the document is ready
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('AI Inventory Optimization System initialized');
+    checkLLMStatus();
     
-    // Enable tooltips
+    // Add click handler for tooltips
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
-    
-    // Enable popovers
-    const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
-    popoverTriggerList.map(function (popoverTriggerEl) {
-        return new bootstrap.Popover(popoverTriggerEl);
-    });
-    
-    // Add fade-in animation to cards
-    const cards = document.querySelectorAll('.card');
-    cards.forEach((card, index) => {
-        setTimeout(() => {
-            card.classList.add('fade-in');
-        }, index * 100);
-    });
 });
 
 /**
- * Format a number with commas as thousands separators
- * @param {number} num - The number to format
- * @returns {string} Formatted number
+ * Check LLM connection status
  */
-function formatNumber(num) {
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+function checkLLMStatus() {
+    fetch('/api/llm-status')
+        .then(response => response.json())
+        .then(data => {
+            appState.llmAvailable = data.llm_available;
+            updateLLMStatusIndicator();
+        })
+        .catch(error => {
+            console.error('Error checking LLM status:', error);
+            appState.llmAvailable = false;
+            updateLLMStatusIndicator();
+        });
 }
 
 /**
- * Format a date as a string
- * @param {Date|string} date - Date object or date string
- * @param {boolean} includeTime - Whether to include time
- * @returns {string} Formatted date string
+ * Update the LLM status indicator in the UI
  */
-function formatDate(date, includeTime = false) {
-    const d = new Date(date);
-    const options = {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    };
+function updateLLMStatusIndicator() {
+    const statusElement = document.getElementById('llm-status');
+    if (!statusElement) return;
     
-    if (includeTime) {
-        options.hour = '2-digit';
-        options.minute = '2-digit';
+    if (appState.llmAvailable) {
+        statusElement.innerHTML = '<span class="badge text-bg-success me-2">LLM: Available</span>';
+    } else {
+        statusElement.innerHTML = '<span class="badge text-bg-warning me-2">LLM: Unavailable</span>';
     }
-    
-    return d.toLocaleDateString('en-US', options);
 }
 
 /**
- * Format a price with currency symbol
- * @param {number} price - The price to format
- * @param {string} currency - Currency code (default: USD)
- * @returns {string} Formatted price
+ * Format currency values
  */
-function formatPrice(price, currency = 'USD') {
+function formatCurrency(value) {
     return new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency: currency
-    }).format(price);
+        currency: 'USD'
+    }).format(value);
 }
 
 /**
- * Calculate the percentage change between two values
- * @param {number} oldValue - Original value
- * @param {number} newValue - New value
- * @returns {number} Percentage change
+ * Format date values
  */
-function calculatePercentageChange(oldValue, newValue) {
-    if (oldValue === 0) return newValue > 0 ? 100 : 0;
-    return ((newValue - oldValue) / Math.abs(oldValue)) * 100;
+function formatDate(dateString) {
+    const options = { year: 'numeric', month: 'short', day: 'numeric' };
+    return new Date(dateString).toLocaleDateString(undefined, options);
 }
 
 /**
- * Format a percentage value
- * @param {number} value - Percentage value
- * @param {number} decimals - Number of decimal places
- * @returns {string} Formatted percentage
+ * Format percentage values
  */
-function formatPercentage(value, decimals = 1) {
-    return `${value > 0 ? '+' : ''}${value.toFixed(decimals)}%`;
+function formatPercent(value) {
+    return new Intl.NumberFormat('en-US', {
+        style: 'percent',
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1
+    }).format(value / 100);
 }
 
 /**
- * Show a success toast notification
- * @param {string} message - Message to display
+ * Get badge class for inventory status
  */
-function showSuccessToast(message) {
-    showToast(message, 'success');
+function getInventoryStatusBadgeClass(status) {
+    status = status.toUpperCase();
+    if (status === 'OUT_OF_STOCK') return 'danger';
+    if (status === 'LOW_STOCK') return 'warning';
+    if (status === 'ADEQUATE') return 'success';
+    if (status === 'OVERSTOCKED') return 'info';
+    return 'secondary';
 }
 
 /**
- * Show an error toast notification
- * @param {string} message - Message to display
+ * Get badge class for pricing strategy
  */
-function showErrorToast(message) {
-    showToast(message, 'danger');
+function getPricingStrategyBadgeClass(strategy) {
+    strategy = strategy.toUpperCase();
+    if (strategy === 'PREMIUM') return 'info';
+    if (strategy === 'STANDARD') return 'primary';
+    if (strategy === 'DISCOUNT') return 'warning';
+    if (strategy === 'CLEARANCE') return 'danger';
+    return 'secondary';
 }
 
 /**
- * Show a toast notification
- * @param {string} message - Message to display
- * @param {string} type - Type of toast (success, danger, warning, info)
+ * Get badge class for agent type
  */
-function showToast(message, type = 'info') {
-    // Create toast container if it doesn't exist
-    let toastContainer = document.querySelector('.toast-container');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
-        document.body.appendChild(toastContainer);
+function getAgentTypeBadgeClass(agentType) {
+    agentType = agentType.toLowerCase();
+    if (agentType === 'demand') return 'danger';
+    if (agentType === 'inventory') return 'primary';
+    if (agentType === 'pricing') return 'warning';
+    return 'secondary';
+}
+
+/**
+ * Show an error message to the user
+ */
+function showErrorMessage(message) {
+    // Check if we already have an alert container
+    let alertContainer = document.getElementById('alert-container');
+    
+    if (!alertContainer) {
+        // Create a container for alerts if it doesn't exist
+        alertContainer = document.createElement('div');
+        alertContainer.id = 'alert-container';
+        alertContainer.className = 'position-fixed top-0 start-50 translate-middle-x p-3';
+        alertContainer.style.zIndex = '1050';
+        document.body.appendChild(alertContainer);
     }
     
-    // Create toast element
-    const toastId = 'toast-' + Date.now();
-    const toastHtml = `
-        <div id="${toastId}" class="toast bg-${type}" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="toast-header">
-                <strong class="me-auto">AI Inventory System</strong>
-                <small>${formatDate(new Date(), true)}</small>
-                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-            <div class="toast-body text-${type === 'warning' ? 'dark' : 'white'}">
-                ${message}
-            </div>
+    // Create the alert
+    const alertId = 'alert-' + Date.now();
+    const alertHtml = `
+        <div id="${alertId}" class="alert alert-danger alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     `;
     
-    // Add toast to container
-    toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+    alertContainer.innerHTML += alertHtml;
     
-    // Initialize and show toast
-    const toastElement = document.getElementById(toastId);
-    const toast = new bootstrap.Toast(toastElement, {
-        autohide: true,
-        delay: 5000
-    });
-    toast.show();
+    // Automatically remove the alert after 5 seconds
+    setTimeout(() => {
+        const alertElement = document.getElementById(alertId);
+        if (alertElement) {
+            const bsAlert = new bootstrap.Alert(alertElement);
+            bsAlert.close();
+        }
+    }, 5000);
+}
+
+/**
+ * Show a success message to the user
+ */
+function showSuccessMessage(message) {
+    // Check if we already have an alert container
+    let alertContainer = document.getElementById('alert-container');
     
-    // Remove toast after it's hidden
-    toastElement.addEventListener('hidden.bs.toast', function() {
-        toastElement.remove();
-    });
+    if (!alertContainer) {
+        // Create a container for alerts if it doesn't exist
+        alertContainer = document.createElement('div');
+        alertContainer.id = 'alert-container';
+        alertContainer.className = 'position-fixed top-0 start-50 translate-middle-x p-3';
+        alertContainer.style.zIndex = '1050';
+        document.body.appendChild(alertContainer);
+    }
+    
+    // Create the alert
+    const alertId = 'alert-' + Date.now();
+    const alertHtml = `
+        <div id="${alertId}" class="alert alert-success alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    
+    alertContainer.innerHTML += alertHtml;
+    
+    // Automatically remove the alert after 5 seconds
+    setTimeout(() => {
+        const alertElement = document.getElementById(alertId);
+        if (alertElement) {
+            const bsAlert = new bootstrap.Alert(alertElement);
+            bsAlert.close();
+        }
+    }, 5000);
 }

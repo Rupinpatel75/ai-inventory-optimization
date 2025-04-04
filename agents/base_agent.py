@@ -1,229 +1,236 @@
+"""
+Base Agent module for the AI Inventory Optimization System.
+
+This module provides the base functionality for all specialized agents
+including logging, database access, and LLM integration.
+"""
+
 import logging
 import json
-import time
-from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
-import traceback
-
-from app import db
-from models import AgentAction
-from utils.llm_integration import llm_manager
-from utils.web_scraper import scraper
+from models import Product, Store, AgentLog, db
+try:
+    from utils.llm_integration import analyze_with_llm_provider
+except ImportError:
+    analyze_with_llm_provider = None
 
 logger = logging.getLogger(__name__)
 
 class BaseAgent:
     """
     Base class for all agents in the system.
-    Provides common functionality for all agent types.
+    
+    This class provides common functionality like logging, database access,
+    and LLM integration that all specialized agents will inherit.
     """
     
-    def __init__(self, name: str, agent_type: str):
+    def __init__(self, agent_type):
         """
-        Initialize base agent
+        Initialize the base agent with a specified type.
         
         Args:
-            name: Human-readable agent name
-            agent_type: Type of agent (demand, inventory, pricing)
+            agent_type (str): Type of the agent (e.g., 'demand', 'inventory', 'pricing')
         """
-        self.name = name
         self.agent_type = agent_type
-        self.llm = llm_manager  # LLM integration
-        self.scraper = scraper  # Web scraper
-        logger.info(f"{self.name} initialized")
+        self.cache = {}
     
-    def log_action(self, 
-                   action: str, 
-                   product_id: Optional[int] = None, 
-                   store_id: Optional[int] = None, 
-                   details: Optional[Dict[str, Any]] = None) -> None:
+    def log_action(self, action, product_id=None, store_id=None, details=None):
         """
-        Log an agent action to the database
+        Log an agent action to the database.
         
         Args:
-            action: Description of the action
-            product_id: Optional ID of the product involved
-            store_id: Optional ID of the store involved
-            details: Optional dictionary with action details
+            action (str): Description of the action performed
+            product_id (int, optional): ID of the product involved
+            store_id (int, optional): ID of the store involved
+            details (dict, optional): Additional details about the action
+        
+        Returns:
+            bool: True if logging succeeded, False otherwise
         """
         try:
-            agent_action = AgentAction(
+            if details is None:
+                details = {}
+            
+            # Ensure details is serializable
+            serialized_details = json.dumps(details)
+            
+            # Create log entry
+            log_entry = AgentLog(
                 agent_type=self.agent_type,
                 action=action,
                 product_id=product_id,
                 store_id=store_id,
-                details=json.dumps(details) if details else None,
+                details=serialized_details,
                 timestamp=datetime.now()
             )
-            db.session.add(agent_action)
+            
+            # Add and commit to database
+            db.session.add(log_entry)
             db.session.commit()
+            
+            logger.info(f"Agent {self.agent_type} logged action: {action}")
+            return True
+            
         except Exception as e:
             logger.error(f"Error logging agent action: {str(e)}")
+            # Rollback in case of error
             db.session.rollback()
+            return False
     
-    def analyze_with_llm(self, 
-                         prompt: str, 
-                         context: Optional[Dict[str, Any]] = None, 
-                         system_prompt: Optional[str] = None) -> str:
+    def get_product(self, product_id):
         """
-        Use the LLM to analyze data or make decisions
+        Get a product by ID.
         
         Args:
-            prompt: The prompt to send to the LLM
-            context: Optional context information
-            system_prompt: Optional system prompt
+            product_id: ID of the product
             
         Returns:
-            LLM response
+            Product object or None if not found
         """
-        if not self.llm or not self.llm.check_ollama_available():
-            logger.warning("LLM not available for analysis")
-            return "LLM analysis not available"
-        
         try:
-            # Format the prompt with context if provided
-            formatted_prompt = prompt
-            if context:
-                context_str = json.dumps(context, indent=2)
-                formatted_prompt = f"{prompt}\n\nContext:\n{context_str}"
+            # Try to get from cache first
+            cache_key = f"product_{product_id}"
+            if cache_key in self.cache:
+                return self.cache[cache_key]
             
-            # Get response from LLM
-            response = self.llm.query_llm(
-                prompt=formatted_prompt,
-                system_prompt=system_prompt or f"You are the {self.name}, an AI agent specializing in {self.agent_type} analysis.",
-                temperature=0.2  # Lower temperature for more consistent responses
+            # Query the database
+            product = db.session.query(Product).filter_by(id=product_id).first()
+            
+            # Cache for future use
+            if product:
+                self.cache[cache_key] = product
+            
+            return product
+            
+        except Exception as e:
+            logger.error(f"Error retrieving product {product_id}: {str(e)}")
+            return None
+    
+    def get_store(self, store_id):
+        """
+        Get a store by ID.
+        
+        Args:
+            store_id: ID of the store
+            
+        Returns:
+            Store object or None if not found
+        """
+        try:
+            # Try to get from cache first
+            cache_key = f"store_{store_id}"
+            if cache_key in self.cache:
+                return self.cache[cache_key]
+            
+            # Query the database
+            store = db.session.query(Store).filter_by(id=store_id).first()
+            
+            # Cache for future use
+            if store:
+                self.cache[cache_key] = store
+            
+            return store
+            
+        except Exception as e:
+            logger.error(f"Error retrieving store {store_id}: {str(e)}")
+            return None
+    
+    def get_all_products(self, category=None):
+        """
+        Get all products, optionally filtered by category.
+        
+        Args:
+            category (str, optional): Product category to filter by
+            
+        Returns:
+            List of Product objects
+        """
+        try:
+            query = db.session.query(Product)
+            
+            if category:
+                query = query.filter_by(category=category)
+            
+            return query.all()
+            
+        except Exception as e:
+            logger.error(f"Error retrieving products: {str(e)}")
+            return []
+    
+    def get_all_stores(self, region=None):
+        """
+        Get all stores, optionally filtered by region.
+        
+        Args:
+            region (str, optional): Store region to filter by
+            
+        Returns:
+            List of Store objects
+        """
+        try:
+            query = db.session.query(Store)
+            
+            if region:
+                query = query.filter_by(region=region)
+            
+            return query.all()
+            
+        except Exception as e:
+            logger.error(f"Error retrieving stores: {str(e)}")
+            return []
+    
+    def analyze_with_llm(self, prompt):
+        """
+        Analyze a prompt using an LLM provider.
+        
+        Args:
+            prompt (str): The prompt to analyze
+            
+        Returns:
+            str: The LLM response or None if not available/error
+        """
+        try:
+            # Skip if no LLM integration is available
+            if analyze_with_llm_provider is None:
+                logger.warning("LLM integration not available")
+                return None
+            
+            # Call the LLM provider
+            response = analyze_with_llm_provider(
+                prompt=prompt,
+                agent_type=self.agent_type
             )
             
             return response
+            
         except Exception as e:
-            logger.error(f"Error in LLM analysis: {str(e)}")
-            return f"Error in analysis: {str(e)}"
+            logger.error(f"Error analyzing with LLM: {str(e)}")
+            return None
     
-    def fetch_external_data(self, 
-                            data_source: str, 
-                            parameters: Dict[str, Any] = None) -> Dict[str, Any]:
-        """
-        Fetch data from external sources (web or API)
-        
-        Args:
-            data_source: URL or API endpoint
-            parameters: Parameters for the request
-            
-        Returns:
-            Fetched data
-        """
-        try:
-            if not parameters:
-                parameters = {}
-            
-            # Check if this is a web page or API
-            if data_source.startswith('http'):
-                if 'api' in data_source or parameters.get('api', False):
-                    # Call API
-                    method = parameters.get('method', 'GET')
-                    params = parameters.get('params', {})
-                    data = parameters.get('data', {})
-                    headers = parameters.get('headers', {})
-                    
-                    return self.scraper.call_api(
-                        url=data_source,
-                        method=method,
-                        params=params,
-                        data=data,
-                        headers=headers
-                    )
-                else:
-                    # Scrape web page
-                    if parameters.get('extract_text', False):
-                        text = self.scraper.extract_text_content(data_source)
-                        return {
-                            'success': bool(text),
-                            'text': text,
-                            'url': data_source
-                        }
-                    elif parameters.get('extract_product', False):
-                        product_info = self.scraper.extract_product_info(data_source)
-                        return {
-                            'success': bool(product_info),
-                            'product': product_info,
-                            'url': data_source
-                        }
-                    else:
-                        # Default to HTML scraping
-                        soup = self.scraper.scrape_html(data_source)
-                        if soup:
-                            # Extract title and basic info
-                            title = soup.title.text if soup.title else "Unknown"
-                            return {
-                                'success': True,
-                                'title': title,
-                                'url': data_source,
-                                'soup': soup  # BeautifulSoup object for further processing
-                            }
-                        else:
-                            return {
-                                'success': False,
-                                'error': 'Failed to scrape page',
-                                'url': data_source
-                            }
-            else:
-                logger.warning(f"Invalid data source: {data_source}")
-                return {
-                    'success': False,
-                    'error': 'Invalid data source URL',
-                    'url': data_source
-                }
-        except Exception as e:
-            logger.error(f"Error fetching external data from {data_source}: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e),
-                'url': data_source,
-                'traceback': traceback.format_exc()
-            }
-            
-    def embed_text(self, text: str) -> List[float]:
-        """
-        Create an embedding vector for text using the LLM
-        
-        Args:
-            text: Text to embed
-            
-        Returns:
-            Embedding vector
-        """
-        if not self.llm:
-            logger.warning("LLM not available for embedding")
-            return []
-        
-        try:
-            embedding = self.llm.get_embedding(text)
-            return embedding
-        except Exception as e:
-            logger.error(f"Error creating embedding: {str(e)}")
-            return []
+    def clear_cache(self):
+        """Clear the agent's cache."""
+        self.cache = {}
+        logger.info(f"Agent {self.agent_type} cache cleared")
     
-    def compare_embeddings(self, text1: str, text2: str) -> float:
+    def get_recent_logs(self, limit=20):
         """
-        Compare two texts using embeddings similarity
+        Get recent logs for this agent type.
         
         Args:
-            text1: First text
-            text2: Second text
+            limit (int): Maximum number of logs to return
             
         Returns:
-            Similarity score (0-1)
+            List of AgentLog objects
         """
-        if not self.llm:
-            logger.warning("LLM not available for embedding comparison")
-            return 0.0
-        
         try:
-            embedding1 = self.llm.get_embedding(text1)
-            embedding2 = self.llm.get_embedding(text2)
+            logs = db.session.query(AgentLog).filter_by(
+                agent_type=self.agent_type
+            ).order_by(
+                AgentLog.timestamp.desc()
+            ).limit(limit).all()
             
-            similarity = self.llm.calculate_similarity(embedding1, embedding2)
-            return similarity
+            return logs
+            
         except Exception as e:
-            logger.error(f"Error comparing embeddings: {str(e)}")
-            return 0.0
+            logger.error(f"Error retrieving agent logs: {str(e)}")
+            return []

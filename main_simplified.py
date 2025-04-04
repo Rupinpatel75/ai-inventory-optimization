@@ -1,13 +1,11 @@
 """
 Entry point for the AI Inventory Optimization System.
 
-This file is the entry point for the application when run on Replit or
-with Gunicorn. It imports the Flask app from app_minimal.py and makes it
-available to the WSGI server.
+This is a simplified version to help debug the application.
 """
 
 import logging
-from app_minimal import app
+from app_simplified import app
 
 # Configure logging
 logging.basicConfig(
@@ -17,5 +15,5 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
-    logger.info("Starting AI Inventory Optimization System (Minimal Version)")
+    logger.info("Starting AI Inventory Optimization System (simplified)")
     app.run(host="0.0.0.0", port=5000, debug=True)

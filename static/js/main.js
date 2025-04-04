@@ -1,190 +1,138 @@
 /**
- * Main JavaScript for AI Inventory Optimization System
+ * AI Inventory Optimization System - Main JavaScript
+ * 
+ * Common functions and utilities for the web application.
  */
 
-// Global state for the application
-const appState = {
-    products: [],
-    stores: [],
-    llmAvailable: false,
-};
-
-// Initialize the application when the document is ready
 document.addEventListener('DOMContentLoaded', function() {
+    // Check LLM Status on page load
     checkLLMStatus();
     
-    // Add click handler for tooltips
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.map(function (tooltipTriggerEl) {
-        return new bootstrap.Tooltip(tooltipTriggerEl);
-    });
+    // Set up periodic LLM status check
+    setInterval(checkLLMStatus, 60000); // Check every minute
 });
 
 /**
- * Check LLM connection status
+ * Check if the LLM is available
  */
 function checkLLMStatus() {
     fetch('/api/llm-status')
         .then(response => response.json())
         .then(data => {
-            appState.llmAvailable = data.llm_available;
-            updateLLMStatusIndicator();
+            const statusDot = document.querySelector('.status-dot');
+            const statusText = document.querySelector('.status-text');
+            
+            if (data.success) {
+                if (data.llm_available) {
+                    statusDot.classList.remove('status-offline');
+                    statusDot.classList.add('status-online');
+                    statusText.textContent = 'LLM Status: Online';
+                } else {
+                    statusDot.classList.remove('status-online');
+                    statusDot.classList.add('status-offline');
+                    statusText.textContent = 'LLM Status: Offline';
+                }
+            } else {
+                statusDot.classList.remove('status-online');
+                statusDot.classList.add('status-offline');
+                statusText.textContent = 'LLM Status: Error';
+            }
         })
         .catch(error => {
             console.error('Error checking LLM status:', error);
-            appState.llmAvailable = false;
-            updateLLMStatusIndicator();
+            
+            // Update UI to show error
+            const statusDot = document.querySelector('.status-dot');
+            const statusText = document.querySelector('.status-text');
+            
+            statusDot.classList.remove('status-online');
+            statusDot.classList.add('status-offline');
+            statusText.textContent = 'LLM Status: Error';
         });
 }
 
 /**
- * Update the LLM status indicator in the UI
+ * Format a number as currency
  */
-function updateLLMStatusIndicator() {
-    const statusElement = document.getElementById('llm-status');
-    if (!statusElement) return;
-    
-    if (appState.llmAvailable) {
-        statusElement.innerHTML = '<span class="badge text-bg-success me-2">LLM: Available</span>';
-    } else {
-        statusElement.innerHTML = '<span class="badge text-bg-warning me-2">LLM: Unavailable</span>';
-    }
+function formatCurrency(amount) {
+    return '$' + parseFloat(amount).toFixed(2);
 }
 
 /**
- * Format currency values
- */
-function formatCurrency(value) {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD'
-    }).format(value);
-}
-
-/**
- * Format date values
+ * Format a date string to display format
  */
 function formatDate(dateString) {
-    const options = { year: 'numeric', month: 'short', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+    const date = new Date(dateString);
+    return date.toLocaleDateString();
 }
 
 /**
- * Format percentage values
+ * Show a toast notification
  */
-function formatPercent(value) {
-    return new Intl.NumberFormat('en-US', {
-        style: 'percent',
-        minimumFractionDigits: 1,
-        maximumFractionDigits: 1
-    }).format(value / 100);
-}
-
-/**
- * Get badge class for inventory status
- */
-function getInventoryStatusBadgeClass(status) {
-    status = status.toUpperCase();
-    if (status === 'OUT_OF_STOCK') return 'danger';
-    if (status === 'LOW_STOCK') return 'warning';
-    if (status === 'ADEQUATE') return 'success';
-    if (status === 'OVERSTOCKED') return 'info';
-    return 'secondary';
-}
-
-/**
- * Get badge class for pricing strategy
- */
-function getPricingStrategyBadgeClass(strategy) {
-    strategy = strategy.toUpperCase();
-    if (strategy === 'PREMIUM') return 'info';
-    if (strategy === 'STANDARD') return 'primary';
-    if (strategy === 'DISCOUNT') return 'warning';
-    if (strategy === 'CLEARANCE') return 'danger';
-    return 'secondary';
-}
-
-/**
- * Get badge class for agent type
- */
-function getAgentTypeBadgeClass(agentType) {
-    agentType = agentType.toLowerCase();
-    if (agentType === 'demand') return 'danger';
-    if (agentType === 'inventory') return 'primary';
-    if (agentType === 'pricing') return 'warning';
-    return 'secondary';
-}
-
-/**
- * Show an error message to the user
- */
-function showErrorMessage(message) {
-    // Check if we already have an alert container
-    let alertContainer = document.getElementById('alert-container');
-    
-    if (!alertContainer) {
-        // Create a container for alerts if it doesn't exist
-        alertContainer = document.createElement('div');
-        alertContainer.id = 'alert-container';
-        alertContainer.className = 'position-fixed top-0 start-50 translate-middle-x p-3';
-        alertContainer.style.zIndex = '1050';
-        document.body.appendChild(alertContainer);
+function showToast(message, type = 'info') {
+    // Check if toast container exists, create if not
+    let toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        document.body.appendChild(toastContainer);
     }
     
-    // Create the alert
-    const alertId = 'alert-' + Date.now();
-    const alertHtml = `
-        <div id="${alertId}" class="alert alert-danger alert-dismissible fade show" role="alert">
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    // Create toast element
+    const toastId = 'toast-' + Date.now();
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-white bg-${type} border-0`;
+    toast.id = toastId;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+    
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
     `;
     
-    alertContainer.innerHTML += alertHtml;
+    // Add to container
+    toastContainer.appendChild(toast);
     
-    // Automatically remove the alert after 5 seconds
-    setTimeout(() => {
-        const alertElement = document.getElementById(alertId);
-        if (alertElement) {
-            const bsAlert = new bootstrap.Alert(alertElement);
-            bsAlert.close();
-        }
-    }, 5000);
+    // Initialize and show the toast
+    const bsToast = new bootstrap.Toast(toast, {
+        autohide: true,
+        delay: 5000
+    });
+    bsToast.show();
 }
 
 /**
- * Show a success message to the user
+ * Get a color for a chart based on index
  */
-function showSuccessMessage(message) {
-    // Check if we already have an alert container
-    let alertContainer = document.getElementById('alert-container');
+function getChartColor(index) {
+    const colors = [
+        '#0dcaf0', // info
+        '#0d6efd', // primary
+        '#6610f2', // purple
+        '#fd7e14', // orange
+        '#20c997', // teal
+        '#d63384', // pink
+        '#198754', // success
+        '#dc3545', // danger
+        '#ffc107', // warning
+        '#6c757d'  // secondary
+    ];
     
-    if (!alertContainer) {
-        // Create a container for alerts if it doesn't exist
-        alertContainer = document.createElement('div');
-        alertContainer.id = 'alert-container';
-        alertContainer.className = 'position-fixed top-0 start-50 translate-middle-x p-3';
-        alertContainer.style.zIndex = '1050';
-        document.body.appendChild(alertContainer);
-    }
-    
-    // Create the alert
-    const alertId = 'alert-' + Date.now();
-    const alertHtml = `
-        <div id="${alertId}" class="alert alert-success alert-dismissible fade show" role="alert">
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    `;
-    
-    alertContainer.innerHTML += alertHtml;
-    
-    // Automatically remove the alert after 5 seconds
-    setTimeout(() => {
-        const alertElement = document.getElementById(alertId);
-        if (alertElement) {
-            const bsAlert = new bootstrap.Alert(alertElement);
-            bsAlert.close();
-        }
-    }, 5000);
+    return colors[index % colors.length];
+}
+
+/**
+ * Initialize tooltips on a page
+ */
+function initTooltips() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
 }

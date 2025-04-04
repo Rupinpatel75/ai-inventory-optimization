@@ -1,127 +1,151 @@
-/* Main styles for AI Inventory Optimization System */
+/* Custom CSS styles for the AI Inventory Optimization System */
 
-/* Dashboard specific styles */
-.card {
-    margin-bottom: 1.5rem;
+/* Navbar branding */
+.navbar .brand-text {
+    font-weight: 600;
+    font-size: 1.2rem;
 }
 
-.chart-container {
-    position: relative;
-    height: 300px;
-    width: 100%;
+/* Status indicators */
+.llm-status {
+    display: flex;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 4px;
+    background-color: var(--bs-dark);
 }
 
-/* Custom badge colors for inventory status */
-.badge-out-of-stock {
-    background-color: var(--bs-danger);
+.status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
 }
 
-.badge-low-stock {
-    background-color: var(--bs-warning);
-}
-
-.badge-adequate {
+.status-online {
     background-color: var(--bs-success);
 }
 
-.badge-overstocked {
-    background-color: var(--bs-info);
-}
-
-/* Agent type badge colors */
-.badge-demand {
+.status-offline {
     background-color: var(--bs-danger);
 }
 
-.badge-inventory {
-    background-color: var(--bs-primary);
+/* Chart containers */
+.chart-container {
+    height: 300px;
+    position: relative;
 }
 
-.badge-pricing {
-    background-color: var(--bs-warning);
-    color: var(--bs-dark);
+/* Card styling */
+.card {
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-/* Custom alert styling */
-.alert-recommendation {
-    background-color: rgba(0, 123, 255, 0.1);
-    border-color: var(--bs-primary);
-    color: var(--bs-light);
+.card-header {
+    font-weight: 600;
 }
 
-/* Card hover effects */
-.card-hover {
-    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+/* Table improvements */
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
-.card-hover:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+/* Recommendation badges */
+.recommendation-badge {
+    display: inline-block;
+    padding: 0.35em 0.65em;
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25rem;
 }
 
-/* Custom footer styling */
+/* Footer styling */
 .footer {
     position: absolute;
     bottom: 0;
     width: 100%;
-    height: 60px;
-    line-height: 60px;
+    padding: 15px 0;
+    background-color: var(--bs-dark);
+    font-size: 0.9rem;
 }
 
-/* Make sure the body has enough padding for the footer */
-body {
-    min-height: 100vh;
-    position: relative;
-    padding-bottom: 70px;
+/* Dashboard overview sections */
+.dashboard-stat {
+    text-align: center;
+    padding: 20px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.dashboard-stat-title {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    color: var(--bs-gray-500);
+    margin-bottom: 5px;
+}
+
+.dashboard-stat-value {
+    font-size: 2.5rem;
+    font-weight: 600;
+    color: var(--bs-info);
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-    .card-stats {
-        margin-bottom: 1rem;
+    .dashboard-stat-value {
+        font-size: 2rem;
     }
     
-    body {
-        padding-bottom: 120px;
-    }
-    
-    .footer {
-        height: 100px;
+    .chart-container {
+        height: 250px;
     }
 }
 
-/* Modal customizations */
-.modal-header {
-    border-bottom: 1px solid var(--bs-gray-700);
+/* Details modal */
+.modal-content {
+    border: 1px solid var(--bs-gray-700);
 }
 
-.modal-footer {
+/* Progress bars */
+.progress {
+    background-color: var(--bs-gray-800);
+}
+
+/* Add some padding to the body to account for fixed footer */
+body {
+    padding-bottom: 60px;
+    min-height: 100vh;
+    position: relative;
+}
+
+/* Make sure there's good spacing between content sections */
+.section-divider {
+    margin: 30px 0;
     border-top: 1px solid var(--bs-gray-700);
 }
 
-/* Table responsive improvements */
-.table-responsive {
-    min-height: 300px;
+/* Text styling */
+.text-highlight {
+    color: var(--bs-info);
 }
 
-/* LLM status indicator */
-#llm-status .badge {
-    font-size: 0.8rem;
-    padding: 0.5em 0.75em;
-}
-
-/* Pre-formatted code in cards */
-pre.card-text {
-    background-color: var(--bs-dark);
-    padding: 1rem;
-    border-radius: 0.25rem;
+/* Form elements */
+.form-select, .form-control {
+    background-color: var(--bs-gray-800);
+    border-color: var(--bs-gray-700);
     color: var(--bs-light);
-    max-height: 300px;
-    overflow-y: auto;
 }
 
-/* Recommendation details in modal */
-.recommendation-details {
-    max-height: 400px;
-    overflow-y: auto;
+.form-select:focus, .form-control:focus {
+    background-color: var(--bs-gray-800);
+    border-color: var(--bs-info);
+    color: var(--bs-light);
+    box-shadow: 0 0 0 0.25rem rgba(13, 202, 240, 0.25);
 }

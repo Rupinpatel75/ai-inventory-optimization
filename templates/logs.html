@@ -1,105 +1,34 @@
 {% extends "base.html" %}
 
-{% block title %}Agent Logs - AI Inventory Optimization{% endblock %}
+{% block title %}AI Inventory Optimization System - Agent Logs{% endblock %}
 
 {% block content %}
 <div class="row mb-4">
-    <div class="col-lg-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h4 class="mb-0">Agent Activity Logs</h4>
-                <div>
-                    <button id="refreshLogsButton" class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
+    <div class="col-12">
+        <div class="card bg-dark border-secondary">
+            <div class="card-header">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h3>Agent Activity Logs</h3>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex justify-content-md-end">
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-outline-info" id="all-agents-btn">All Agents</button>
+                                <button type="button" class="btn btn-outline-info" id="demand-agent-btn">Demand</button>
+                                <button type="button" class="btn btn-outline-info" id="inventory-agent-btn">Inventory</button>
+                                <button type="button" class="btn btn-outline-info" id="pricing-agent-btn">Pricing</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5>Filter Logs</h5>
-            </div>
-            <div class="card-body">
-                <form id="logFilterForm">
-                    <div class="mb-3">
-                        <label for="agentTypeFilter" class="form-label">Agent Type</label>
-                        <select class="form-select" id="agentTypeFilter">
-                            <option value="">All Agents</option>
-                            <option value="demand">Demand Agent</option>
-                            <option value="inventory">Inventory Agent</option>
-                            <option value="pricing">Pricing Agent</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="actionTypeFilter" class="form-label">Action Type</label>
-                        <select class="form-select" id="actionTypeFilter">
-                            <option value="">All Actions</option>
-                            <option value="prediction">Predictions</option>
-                            <option value="recommendation">Recommendations</option>
-                            <option value="update">Updates</option>
-                            <option value="llm">LLM Interactions</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="productFilter" class="form-label">Product</label>
-                        <select class="form-select" id="productFilter">
-                            <option value="">All Products</option>
-                            {% for product in products %}
-                            <option value="{{ product.id }}">{{ product.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="storeFilter" class="form-label">Store</label>
-                        <select class="form-select" id="storeFilter">
-                            <option value="">All Stores</option>
-                            {% for store in stores %}
-                            <option value="{{ store.id }}">{{ store.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="timeRangeFilter" class="form-label">Time Range</label>
-                        <select class="form-select" id="timeRangeFilter">
-                            <option value="day">Last 24 Hours</option>
-                            <option value="week" selected>Last 7 Days</option>
-                            <option value="month">Last 30 Days</option>
-                            <option value="all">All Time</option>
-                        </select>
-                    </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Apply Filters</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <h5>Log Statistics</h5>
-            </div>
-            <div class="card-body">
-                <canvas id="agentActivityChart"></canvas>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-9">
-        <div class="card">
-            <div class="card-header">
-                <h5>Agent Logs</h5>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table class="table table-dark table-hover">
                         <thead>
                             <tr>
-                                <th>Timestamp</th>
+                                <th>Time</th>
                                 <th>Agent</th>
                                 <th>Action</th>
                                 <th>Product</th>
@@ -107,474 +36,240 @@
                                 <th>Details</th>
                             </tr>
                         </thead>
-                        <tbody id="logsTable">
+                        <tbody id="logs-table-body">
                             <tr>
                                 <td colspan="6" class="text-center">Loading logs...</td>
                             </tr>
                         </tbody>
                     </table>
-                    <div class="d-flex justify-content-between align-items-center mt-3">
-                        <div>
-                            <select id="logsPerPage" class="form-select form-select-sm" style="width: auto;">
-                                <option value="10">10 per page</option>
-                                <option value="25" selected>25 per page</option>
-                                <option value="50">50 per page</option>
-                                <option value="100">100 per page</option>
-                            </select>
-                        </div>
-                        <nav aria-label="Logs pagination">
-                            <ul class="pagination" id="logsPagination">
-                                <!-- Pagination will be inserted here -->
-                            </ul>
-                        </nav>
-                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-center mt-4">
+                    <button class="btn btn-primary" id="load-more-btn">Load More</button>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal for viewing log details -->
-<div class="modal fade" id="logDetailModal" tabindex="-1">
+<!-- Modal for log details -->
+<div class="modal fade" id="log-details-modal" tabindex="-1" aria-labelledby="log-details-label" aria-hidden="true">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
+        <div class="modal-content bg-dark text-light">
             <div class="modal-header">
-                <h5 class="modal-title" id="logDetailModalTitle">Log Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title" id="log-details-label">Agent Action Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body" id="logDetailModalBody">
-                <!-- Content will be dynamically inserted -->
+            <div class="modal-body" id="log-details-body">
+                <!-- Details will be filled in dynamically -->
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block scripts %}
 <script>
-    // Data storage
-    let productsMap = {};
-    let storesMap = {};
-    let logEntries = [];
-    let filteredLogs = [];
+document.addEventListener('DOMContentLoaded', function() {
+    // Variables
+    let currentAgentType = null;
+    let currentLimit = 20;
     let currentPage = 1;
-    let logsPerPage = 25;
-    let agentActivityChart = null;
+    let logsData = [];
     
-    // Initialize data and charts on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        // Fetch products and stores for lookup
-        Promise.all([
-            fetch('/api/products').then(response => response.json()),
-            fetch('/api/stores').then(response => response.json())
-        ])
-        .then(([productsResponse, storesResponse]) => {
-            if (productsResponse.success && storesResponse.success) {
-                // Create lookup maps
-                productsResponse.products.forEach(product => {
-                    productsMap[product.id] = product;
-                });
-                
-                storesResponse.stores.forEach(store => {
-                    storesMap[store.id] = store;
-                });
-                
-                // Load logs
-                loadLogs();
-            }
-        })
-        .catch(error => {
-            console.error('Error loading initial data:', error);
+    // DOM elements
+    const logsTableBody = document.getElementById('logs-table-body');
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    const allAgentsBtn = document.getElementById('all-agents-btn');
+    const demandAgentBtn = document.getElementById('demand-agent-btn');
+    const inventoryAgentBtn = document.getElementById('inventory-agent-btn');
+    const pricingAgentBtn = document.getElementById('pricing-agent-btn');
+    
+    // Set filter buttons active state
+    function setActiveButton(button) {
+        // Remove active class from all buttons
+        [allAgentsBtn, demandAgentBtn, inventoryAgentBtn, pricingAgentBtn].forEach(btn => {
+            btn.classList.remove('active');
+            btn.classList.replace('btn-info', 'btn-outline-info');
         });
         
-        // Set up event listeners
-        document.getElementById('refreshLogsButton').addEventListener('click', loadLogs);
-        document.getElementById('logFilterForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            applyFilters();
-        });
-        document.getElementById('logsPerPage').addEventListener('change', function() {
-            logsPerPage = parseInt(this.value);
-            currentPage = 1;
-            displayLogs();
-        });
-    });
+        // Add active class to the selected button
+        button.classList.add('active');
+        button.classList.replace('btn-outline-info', 'btn-info');
+    }
     
+    // Load logs
     function loadLogs() {
-        // Show loading state
-        document.getElementById('logsTable').innerHTML = '<tr><td colspan="6" class="text-center">Loading logs...</td></tr>';
+        // Show loading
+        logsTableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading logs...</td></tr>';
         
-        // Load logs data
-        fetch('/api/logs')
+        // Build API URL
+        let url = `/api/logs?limit=${currentLimit}`;
+        if (currentAgentType) {
+            url += `&agent_type=${currentAgentType}`;
+        }
+        
+        // Fetch logs
+        fetch(url)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    logEntries = data.logs;
-                    
-                    // Apply any current filters
-                    applyFilters();
-                    
-                    // Update statistics chart
-                    updateLogStatistics();
+                    logsData = data.logs;
+                    displayLogs(logsData);
                 } else {
-                    document.getElementById('logsTable').innerHTML = 
-                        '<tr><td colspan="6" class="text-center">Failed to load logs</td></tr>';
+                    logsTableBody.innerHTML = '<tr><td colspan="6" class="text-center">Error loading logs</td></tr>';
                 }
             })
             .catch(error => {
                 console.error('Error loading logs:', error);
-                document.getElementById('logsTable').innerHTML = 
-                    '<tr><td colspan="6" class="text-center">Error loading logs</td></tr>';
+                logsTableBody.innerHTML = '<tr><td colspan="6" class="text-center">Error loading logs</td></tr>';
             });
     }
     
-    function applyFilters() {
-        const agentTypeFilter = document.getElementById('agentTypeFilter').value;
-        const actionTypeFilter = document.getElementById('actionTypeFilter').value;
-        const productFilter = document.getElementById('productFilter').value;
-        const storeFilter = document.getElementById('storeFilter').value;
-        const timeRangeFilter = document.getElementById('timeRangeFilter').value;
+    // Display logs
+    function displayLogs(logs) {
+        // Clear table
+        logsTableBody.innerHTML = '';
         
-        // Apply filters
-        filteredLogs = logEntries.filter(log => {
-            // Agent type filter
-            if (agentTypeFilter && log.agent_type !== agentTypeFilter) {
-                return false;
-            }
+        if (logs.length === 0) {
+            logsTableBody.innerHTML = '<tr><td colspan="6" class="text-center">No logs found</td></tr>';
+            return;
+        }
+        
+        logs.forEach(log => {
+            // Create row
+            const row = document.createElement('tr');
             
-            // Action type filter
-            if (actionTypeFilter) {
-                const action = log.action.toLowerCase();
-                if (actionTypeFilter === 'prediction' && !action.includes('predict')) {
-                    return false;
-                } else if (actionTypeFilter === 'recommendation' && !action.includes('recommend')) {
-                    return false;
-                } else if (actionTypeFilter === 'update' && !action.includes('update')) {
-                    return false;
-                } else if (actionTypeFilter === 'llm' && !action.includes('llm')) {
-                    return false;
+            // Format timestamp
+            const timestamp = new Date(log.timestamp);
+            const formattedTime = `${timestamp.toLocaleDateString()} ${timestamp.toLocaleTimeString()}`;
+            
+            // Format agent type
+            const agentType = log.agent_type.charAt(0).toUpperCase() + log.agent_type.slice(1);
+            
+            // Check if details exist and are stringified JSON
+            let hasDetails = false;
+            try {
+                if (log.details && (typeof log.details === 'object' || log.details.startsWith('{'))) {
+                    hasDetails = true;
                 }
+            } catch (e) {
+                // Not valid JSON or not a string at all
             }
             
-            // Product filter
-            if (productFilter && log.product_id != productFilter) {
-                return false;
-            }
+            // Generate details button if needed
+            const detailsBtn = hasDetails ? 
+                `<button class="btn btn-sm btn-info view-details" data-log-id="${log.id}">View</button>` : 
+                '<span class="text-muted">None</span>';
             
-            // Store filter
-            if (storeFilter && log.store_id != storeFilter) {
-                return false;
-            }
+            row.innerHTML = `
+                <td>${formattedTime}</td>
+                <td>${agentType}</td>
+                <td>${log.action}</td>
+                <td>${log.product_name || 'N/A'}</td>
+                <td>${log.store_name || 'N/A'}</td>
+                <td>${detailsBtn}</td>
+            `;
             
-            // Time range filter
-            if (timeRangeFilter !== 'all') {
-                const logDate = new Date(log.timestamp);
-                const now = new Date();
-                
-                if (timeRangeFilter === 'day' && (now - logDate) > (24 * 60 * 60 * 1000)) {
-                    return false;
-                } else if (timeRangeFilter === 'week' && (now - logDate) > (7 * 24 * 60 * 60 * 1000)) {
-                    return false;
-                } else if (timeRangeFilter === 'month' && (now - logDate) > (30 * 24 * 60 * 60 * 1000)) {
-                    return false;
-                }
-            }
-            
-            return true;
+            logsTableBody.appendChild(row);
         });
         
-        // Sort by timestamp, newest first
-        filteredLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        
-        // Reset to first page
-        currentPage = 1;
-        
-        // Display filtered logs
-        displayLogs();
-        
-        // Update statistics for filtered logs
-        updateLogStatistics();
-    }
-    
-    function displayLogs() {
-        const tableBody = document.getElementById('logsTable');
-        
-        if (filteredLogs.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No logs found</td></tr>';
-            document.getElementById('logsPagination').innerHTML = '';
-            return;
-        }
-        
-        // Calculate pagination
-        const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
-        const startIndex = (currentPage - 1) * logsPerPage;
-        const endIndex = Math.min(startIndex + logsPerPage, filteredLogs.length);
-        const pageEntries = filteredLogs.slice(startIndex, endIndex);
-        
-        // Generate table rows
-        let tableHtml = '';
-        
-        pageEntries.forEach((log, index) => {
-            const product = log.product_id ? (productsMap[log.product_id] || { name: 'Unknown' }) : { name: '—' };
-            const store = log.store_id ? (storesMap[log.store_id] || { name: 'Unknown' }) : { name: '—' };
-            
-            const logDate = new Date(log.timestamp);
-            const formattedDate = logDate.toLocaleString();
-            
-            tableHtml += `
-                <tr>
-                    <td>${formattedDate}</td>
-                    <td><span class="badge text-bg-${getAgentTypeBadgeClass(log.agent_type)}">${log.agent_type}</span></td>
-                    <td>${log.action}</td>
-                    <td>${product.name}</td>
-                    <td>${store.name}</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-info" 
-                                onclick="showLogDetails(${startIndex + index})">
-                            View
-                        </button>
-                    </td>
-                </tr>
-            `;
-        });
-        
-        tableBody.innerHTML = tableHtml;
-        
-        // Generate pagination controls
-        updatePagination(totalPages);
-    }
-    
-    function updatePagination(totalPages) {
-        const pagination = document.getElementById('logsPagination');
-        
-        if (totalPages <= 1) {
-            pagination.innerHTML = '';
-            return;
-        }
-        
-        let paginationHtml = '';
-        
-        // Previous button
-        paginationHtml += `
-            <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="changePage(${currentPage - 1}); return false;">Previous</a>
-            </li>
-        `;
-        
-        // Page numbers
-        const maxVisiblePages = 5;
-        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-        
-        if (endPage - startPage + 1 < maxVisiblePages) {
-            startPage = Math.max(1, endPage - maxVisiblePages + 1);
-        }
-        
-        if (startPage > 1) {
-            paginationHtml += `
-                <li class="page-item">
-                    <a class="page-link" href="#" onclick="changePage(1); return false;">1</a>
-                </li>
-            `;
-            
-            if (startPage > 2) {
-                paginationHtml += `
-                    <li class="page-item disabled">
-                        <span class="page-link">...</span>
-                    </li>
-                `;
-            }
-        }
-        
-        for (let i = startPage; i <= endPage; i++) {
-            paginationHtml += `
-                <li class="page-item ${i === currentPage ? 'active' : ''}">
-                    <a class="page-link" href="#" onclick="changePage(${i}); return false;">${i}</a>
-                </li>
-            `;
-        }
-        
-        if (endPage < totalPages) {
-            if (endPage < totalPages - 1) {
-                paginationHtml += `
-                    <li class="page-item disabled">
-                        <span class="page-link">...</span>
-                    </li>
-                `;
-            }
-            
-            paginationHtml += `
-                <li class="page-item">
-                    <a class="page-link" href="#" onclick="changePage(${totalPages}); return false;">${totalPages}</a>
-                </li>
-            `;
-        }
-        
-        // Next button
-        paginationHtml += `
-            <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="changePage(${currentPage + 1}); return false;">Next</a>
-            </li>
-        `;
-        
-        pagination.innerHTML = paginationHtml;
-    }
-    
-    function changePage(page) {
-        const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
-        
-        if (page < 1 || page > totalPages) {
-            return;
-        }
-        
-        currentPage = page;
-        displayLogs();
-    }
-    
-    function updateLogStatistics() {
-        // Count logs by agent type
-        const agentCounts = {
-            'demand': 0,
-            'inventory': 0,
-            'pricing': 0
-        };
-        
-        filteredLogs.forEach(log => {
-            if (agentCounts.hasOwnProperty(log.agent_type)) {
-                agentCounts[log.agent_type]++;
-            }
-        });
-        
-        // Create or update chart
-        const ctx = document.getElementById('agentActivityChart').getContext('2d');
-        
-        if (agentActivityChart) {
-            agentActivityChart.destroy();
-        }
-        
-        agentActivityChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: Object.keys(agentCounts).map(label => label.charAt(0).toUpperCase() + label.slice(1)),
-                datasets: [{
-                    label: 'Actions',
-                    data: Object.values(agentCounts),
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.5)',    // Demand - Red
-                        'rgba(54, 162, 235, 0.5)',    // Inventory - Blue
-                        'rgba(255, 206, 86, 0.5)'     // Pricing - Yellow
-                    ],
-                    borderColor: [
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 206, 86, 1)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            precision: 0
-                        }
-                    }
-                }
-            }
+        // Attach event listeners to details buttons
+        document.querySelectorAll('.view-details').forEach(button => {
+            button.addEventListener('click', function() {
+                const logId = this.getAttribute('data-log-id');
+                showLogDetails(logId);
+            });
         });
     }
     
-    function showLogDetails(index) {
-        const log = filteredLogs[index];
+    // Show log details in modal
+    function showLogDetails(logId) {
+        // Find the log
+        const log = logsData.find(l => l.id == logId);
+        if (!log) return;
         
-        if (!log) {
-            return;
-        }
+        // Format details
+        let detailsHtml = '<div class="alert alert-info">No details available</div>';
         
-        const logDate = new Date(log.timestamp);
-        const formattedDate = logDate.toLocaleString();
-        
-        const product = log.product_id ? (productsMap[log.product_id] || { name: 'Unknown' }) : null;
-        const store = log.store_id ? (storesMap[log.store_id] || { name: 'Unknown' }) : null;
-        
-        // Parse details if available
-        let details = {};
         if (log.details) {
             try {
-                details = JSON.parse(log.details);
+                // Parse the details if it's a string
+                const details = typeof log.details === 'object' ? log.details : JSON.parse(log.details);
+                
+                // Format as a code block
+                detailsHtml = `<pre class="bg-dark p-3 border border-secondary rounded"><code>${JSON.stringify(details, null, 2)}</code></pre>`;
             } catch (e) {
-                details = { text: log.details };
+                // If it's not valid JSON, display as raw text
+                detailsHtml = `<pre class="bg-dark p-3 border border-secondary rounded"><code>${log.details}</code></pre>`;
             }
         }
         
-        // Build modal content
-        const modalTitle = document.getElementById('logDetailModalTitle');
-        const modalBody = document.getElementById('logDetailModalBody');
-        
-        modalTitle.textContent = `${log.agent_type.charAt(0).toUpperCase() + log.agent_type.slice(1)} Agent: ${log.action}`;
-        
-        let content = `
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h6 class="mb-0">Log Information</h6>
-                </div>
-                <div class="card-body">
-                    <p><strong>Timestamp:</strong> ${formattedDate}</p>
-                    <p><strong>Agent Type:</strong> <span class="badge text-bg-${getAgentTypeBadgeClass(log.agent_type)}">${log.agent_type}</span></p>
-                    <p><strong>Action:</strong> ${log.action}</p>
-                    ${product ? `<p><strong>Product:</strong> ${product.name}</p>` : ''}
-                    ${store ? `<p><strong>Store:</strong> ${store.name}</p>` : ''}
-                </div>
+        // Set modal content
+        document.getElementById('log-details-label').textContent = `${log.agent_type.toUpperCase()} Agent: ${log.action}`;
+        document.getElementById('log-details-body').innerHTML = `
+            <div class="mb-3">
+                <strong>Time:</strong> ${new Date(log.timestamp).toLocaleString()}
+            </div>
+            <div class="mb-3">
+                <strong>Product:</strong> ${log.product_name || 'N/A'}
+            </div>
+            <div class="mb-3">
+                <strong>Store:</strong> ${log.store_name || 'N/A'}
+            </div>
+            <div>
+                <strong>Details:</strong>
+                ${detailsHtml}
             </div>
         `;
         
-        // Add details if available
-        if (Object.keys(details).length > 0) {
-            content += `
-                <div class="card">
-                    <div class="card-header">
-                        <h6 class="mb-0">Action Details</h6>
-                    </div>
-                    <div class="card-body">
-                        <pre class="log-details">${JSON.stringify(details, null, 2)}</pre>
-                    </div>
-                </div>
-            `;
-        }
-        
-        modalBody.innerHTML = content;
-        
         // Show modal
-        const modal = new bootstrap.Modal(document.getElementById('logDetailModal'));
+        const modal = new bootstrap.Modal(document.getElementById('log-details-modal'));
         modal.show();
     }
     
-    // Helper function for agent type badge colors
-    function getAgentTypeBadgeClass(agentType) {
-        agentType = agentType.toLowerCase();
-        if (agentType === 'demand') return 'danger';
-        if (agentType === 'inventory') return 'primary';
-        if (agentType === 'pricing') return 'warning';
-        return 'secondary';
+    // Load more logs
+    function loadMoreLogs() {
+        currentLimit += 20;
+        loadLogs();
     }
+    
+    // Filter by agent type
+    function filterByAgentType(agentType) {
+        currentAgentType = agentType;
+        currentLimit = 20;
+        loadLogs();
+    }
+    
+    // Event Listeners
+    loadMoreBtn.addEventListener('click', loadMoreLogs);
+    
+    allAgentsBtn.addEventListener('click', function() {
+        setActiveButton(this);
+        filterByAgentType(null);
+    });
+    
+    demandAgentBtn.addEventListener('click', function() {
+        setActiveButton(this);
+        filterByAgentType('demand');
+    });
+    
+    inventoryAgentBtn.addEventListener('click', function() {
+        setActiveButton(this);
+        filterByAgentType('inventory');
+    });
+    
+    pricingAgentBtn.addEventListener('click', function() {
+        setActiveButton(this);
+        filterByAgentType('pricing');
+    });
+    
+    // Initial load
+    setActiveButton(allAgentsBtn);
+    loadLogs();
+});
 </script>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    .log-details {
-        max-height: 400px;
-        overflow-y: auto;
-        background-color: var(--bs-dark);
-        color: var(--bs-light);
-        padding: 1rem;
-        border-radius: 0.25rem;
-    }
-</style>
 {% endblock %}

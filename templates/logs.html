@@ -1,0 +1,427 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<title>AI Inventory Optimization - Agent Logs</title>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card bg-dark">
+            <div class="card-body">
+                <h1 class="card-title">
+                    <i class="fas fa-history me-2"></i>
+                    AI Agent Activity Logs
+                </h1>
+                <p class="card-text">
+                    Track and analyze all AI agent decisions and activities in your inventory system.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card bg-dark">
+            <div class="card-header bg-primary">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0 text-white">Filter Logs</h3>
+                </div>
+            </div>
+            <div class="card-body">
+                <form id="filter-form" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="agent-type" class="form-label">Agent Type</label>
+                        <select class="form-select" id="agent-type">
+                            <option value="" selected>All Agents</option>
+                            <option value="demand">Demand Agent</option>
+                            <option value="inventory">Inventory Agent</option>
+                            <option value="pricing">Pricing Agent</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="product-select" class="form-label">Product</label>
+                        <select class="form-select" id="product-select">
+                            <option value="" selected>All Products</option>
+                            {% for product in products %}
+                            <option value="{{ product.id }}">{{ product.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="limit-select" class="form-label">Show Entries</label>
+                        <select class="form-select" id="limit-select">
+                            <option value="20">20 entries</option>
+                            <option value="50" selected>50 entries</option>
+                            <option value="100">100 entries</option>
+                            <option value="200">200 entries</option>
+                        </select>
+                    </div>
+                    <div class="col-12 text-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter me-2"></i>Apply Filters
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="reset-filters">
+                            <i class="fas fa-undo me-2"></i>Reset
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card bg-dark">
+            <div class="card-header bg-info text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">Agent Activity Logs</h3>
+                    <span class="badge bg-dark" id="log-count">Loading...</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Agent</th>
+                                <th>Action</th>
+                                <th>Product</th>
+                                <th>Store</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-table-body">
+                            <tr>
+                                <td colspan="6" class="text-center">Loading log data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card bg-dark h-100">
+            <div class="card-header bg-success text-white">
+                <h3 class="mb-0">Agent Activity Distribution</h3>
+            </div>
+            <div class="card-body">
+                <canvas id="agent-distribution-chart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card bg-dark h-100">
+            <div class="card-header bg-warning text-dark">
+                <h3 class="mb-0">Actions by Agent Type</h3>
+            </div>
+            <div class="card-body">
+                <canvas id="action-distribution-chart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chart_utils.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize charts
+    let agentDistributionChart = null;
+    let actionDistributionChart = null;
+    
+    // Load initial data
+    loadLogsData();
+    
+    // Add event listeners for filtering
+    document.getElementById('filter-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        loadLogsData();
+    });
+    
+    document.getElementById('reset-filters').addEventListener('click', function() {
+        document.getElementById('agent-type').value = '';
+        document.getElementById('product-select').value = '';
+        document.getElementById('limit-select').value = '50';
+        loadLogsData();
+    });
+    
+    // Function to load logs data
+    function loadLogsData() {
+        // Get filter values
+        const agentType = document.getElementById('agent-type').value;
+        const productId = document.getElementById('product-select').value;
+        const limit = document.getElementById('limit-select').value;
+        
+        // Build query string
+        let queryParams = `limit=${limit}`;
+        if (agentType) {
+            queryParams += `&agent_type=${agentType}`;
+        }
+        if (productId) {
+            queryParams += `&product_id=${productId}`;
+        }
+        
+        // Show loading state
+        document.getElementById('logs-table-body').innerHTML = '<tr><td colspan="6" class="text-center">Loading log data...</td></tr>';
+        document.getElementById('log-count').textContent = 'Loading...';
+        
+        // Fetch data
+        fetch(`/api/logs?${queryParams}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayLogs(data.logs);
+                    updateCharts(data.logs);
+                } else {
+                    document.getElementById('logs-table-body').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading logs</td></tr>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching logs:', error);
+                document.getElementById('logs-table-body').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading logs</td></tr>';
+            });
+    }
+    
+    // Function to display logs in table
+    function displayLogs(logs) {
+        const tableBody = document.getElementById('logs-table-body');
+        document.getElementById('log-count').textContent = `${logs.length} entries`;
+        
+        // Clear table
+        tableBody.innerHTML = '';
+        
+        if (logs.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No logs found matching your criteria</td></tr>';
+            return;
+        }
+        
+        // Add rows
+        logs.forEach(log => {
+            const row = document.createElement('tr');
+            
+            // Format date
+            const timestamp = new Date(log.timestamp);
+            const formattedDate = timestamp.toLocaleString();
+            
+            // Format agent type
+            let agentClass = '';
+            switch (log.agent_type) {
+                case 'demand':
+                    agentClass = 'text-primary';
+                    break;
+                case 'inventory':
+                    agentClass = 'text-success';
+                    break;
+                case 'pricing':
+                    agentClass = 'text-warning';
+                    break;
+            }
+            
+            // Format details
+            let details = '';
+            if (log.details) {
+                try {
+                    const detailsObj = JSON.parse(log.details);
+                    details = Object.entries(detailsObj)
+                        .filter(([key]) => key !== 'product_name' && key !== 'store_name')
+                        .map(([key, value]) => `${key}: ${value}`)
+                        .join(', ');
+                } catch (e) {
+                    details = log.details;
+                }
+            }
+            
+            row.innerHTML = `
+                <td>${formattedDate}</td>
+                <td class="${agentClass}">${log.agent_type.charAt(0).toUpperCase() + log.agent_type.slice(1)} Agent</td>
+                <td>${log.action}</td>
+                <td>${log.product_name || '-'}</td>
+                <td>${log.store_name || '-'}</td>
+                <td>${details}</td>
+            `;
+            
+            tableBody.appendChild(row);
+        });
+    }
+    
+    // Function to update charts
+    function updateCharts(logs) {
+        updateAgentDistributionChart(logs);
+        updateActionDistributionChart(logs);
+    }
+    
+    // Function to update agent distribution chart
+    function updateAgentDistributionChart(logs) {
+        // Count logs by agent type
+        const agentCounts = {
+            'demand': 0,
+            'inventory': 0,
+            'pricing': 0
+        };
+        
+        logs.forEach(log => {
+            if (agentCounts.hasOwnProperty(log.agent_type)) {
+                agentCounts[log.agent_type]++;
+            }
+        });
+        
+        const ctx = document.getElementById('agent-distribution-chart').getContext('2d');
+        
+        // Destroy previous chart if it exists
+        if (agentDistributionChart) {
+            agentDistributionChart.destroy();
+        }
+        
+        // Create new chart
+        agentDistributionChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Demand Agent', 'Inventory Agent', 'Pricing Agent'],
+                datasets: [{
+                    data: [agentCounts.demand, agentCounts.inventory, agentCounts.pricing],
+                    backgroundColor: [
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(255, 193, 7, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(255, 193, 7, 1)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Agent Activity Distribution'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value} actions (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Function to update action distribution chart
+    function updateActionDistributionChart(logs) {
+        // Count actions by agent type
+        const actionsByAgent = {
+            'demand': {},
+            'inventory': {},
+            'pricing': {}
+        };
+        
+        logs.forEach(log => {
+            if (actionsByAgent.hasOwnProperty(log.agent_type)) {
+                if (!actionsByAgent[log.agent_type][log.action]) {
+                    actionsByAgent[log.agent_type][log.action] = 0;
+                }
+                actionsByAgent[log.agent_type][log.action]++;
+            }
+        });
+        
+        // Prepare data for chart
+        const datasets = [
+            {
+                label: 'Demand Agent',
+                data: Object.values(actionsByAgent.demand),
+                backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            },
+            {
+                label: 'Inventory Agent',
+                data: Object.values(actionsByAgent.inventory),
+                backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            },
+            {
+                label: 'Pricing Agent',
+                data: Object.values(actionsByAgent.pricing),
+                backgroundColor: 'rgba(255, 193, 7, 0.7)',
+                borderColor: 'rgba(255, 193, 7, 1)',
+                borderWidth: 1
+            }
+        ];
+        
+        // Get all unique actions
+        const allActions = new Set();
+        Object.values(actionsByAgent).forEach(actions => {
+            Object.keys(actions).forEach(action => allActions.add(action));
+        });
+        const actionLabels = Array.from(allActions);
+        
+        // Update datasets to have data for all actions
+        datasets.forEach(dataset => {
+            const agentType = dataset.label.toLowerCase().split(' ')[0];
+            dataset.data = actionLabels.map(action => actionsByAgent[agentType][action] || 0);
+        });
+        
+        const ctx = document.getElementById('action-distribution-chart').getContext('2d');
+        
+        // Destroy previous chart if it exists
+        if (actionDistributionChart) {
+            actionDistributionChart.destroy();
+        }
+        
+        // Create new chart
+        actionDistributionChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: actionLabels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        stacked: false,
+                    },
+                    y: {
+                        stacked: false,
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Count'
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Actions by Agent Type'
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

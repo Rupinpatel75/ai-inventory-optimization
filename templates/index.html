@@ -1,0 +1,470 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<title>AI Inventory Optimization - Home</title>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card bg-dark">
+            <div class="card-body">
+                <h1 class="card-title">
+                    <i class="fas fa-robot me-2"></i>
+                    AI-Powered Inventory Optimization System
+                </h1>
+                <p class="card-text">
+                    This system uses multi-agent AI to predict demand, optimize inventory levels, and suggest pricing 
+                    strategies to maximize sales and minimize holding costs.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-dark h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-chart-line fa-4x mb-3 text-primary"></i>
+                <h3 class="card-title">Demand Agent</h3>
+                <p class="card-text">
+                    Uses Prophet time-series forecasting to predict future product demand based on historical data, 
+                    seasonal patterns, and market trends.
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-dark h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-boxes fa-4x mb-3 text-success"></i>
+                <h3 class="card-title">Inventory Agent</h3>
+                <p class="card-text">
+                    Optimizes inventory levels to minimize holding costs while preventing stockouts, calculating reorder 
+                    points and economic order quantities.
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-dark h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-tags fa-4x mb-3 text-warning"></i>
+                <h3 class="card-title">Pricing Agent</h3>
+                <p class="card-text">
+                    Recommends optimal pricing strategies based on demand elasticity, inventory levels, and market conditions
+                    to maximize profit margins.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card bg-dark">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">Get Started</h3>
+            </div>
+            <div class="card-body">
+                <form id="prediction-form">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="product-select" class="form-label">Select Product</label>
+                            <select class="form-select" id="product-select" required>
+                                <option value="" selected disabled>Choose a product</option>
+                                {% for product in products %}
+                                <option value="{{ product.id }}">{{ product.name }} ({{ product.category }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="store-select" class="form-label">Select Store</label>
+                            <select class="form-select" id="store-select" required>
+                                <option value="" selected disabled>Choose a store</option>
+                                {% for store in stores %}
+                                <option value="{{ store.id }}">{{ store.name }} ({{ store.location }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="days-select" class="form-label">Forecast Days</label>
+                            <select class="form-select" id="days-select">
+                                <option value="7">7 days</option>
+                                <option value="14">14 days</option>
+                                <option value="30" selected>30 days</option>
+                                <option value="60">60 days</option>
+                                <option value="90">90 days</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-robot me-2"></i>
+                            Generate AI Recommendations
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4 d-none" id="results-container">
+    <div class="col-md-12">
+        <div class="card bg-dark">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">AI Recommendations</h3>
+                <div>
+                    <span class="badge bg-primary" id="product-badge"></span>
+                    <span class="badge bg-secondary" id="store-badge"></span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <h4><i class="fas fa-chart-line me-2"></i>Demand Forecast</h4>
+                        <canvas id="demand-chart" height="200"></canvas>
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card bg-dark border-success">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>Inventory Recommendation</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="inventory-recommendation"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card bg-dark border-warning">
+                            <div class="card-header bg-warning text-dark">
+                                <h5 class="mb-0"><i class="fas fa-tags me-2"></i>Pricing Recommendation</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="pricing-recommendation"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card bg-dark">
+            <div class="card-header bg-info text-white">
+                <h3 class="mb-0">How It Works</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="d-flex mb-3">
+                            <div class="flex-shrink-0">
+                                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                    <i class="fas fa-database fa-lg text-white"></i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <h5>1. Data Collection</h5>
+                                <p>Historical sales data, inventory levels, and market trends are collected and analyzed.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex mb-3">
+                            <div class="flex-shrink-0">
+                                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                    <i class="fas fa-brain fa-lg text-white"></i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <h5>2. AI Analysis</h5>
+                                <p>Multi-agent AI system processes the data to generate optimized recommendations.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex mb-3">
+                            <div class="flex-shrink-0">
+                                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                    <i class="fas fa-lightbulb fa-lg text-white"></i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <h5>3. Recommendations</h5>
+                                <p>System provides actionable insights for inventory management and pricing.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chart_utils.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const predictionForm = document.getElementById('prediction-form');
+    const resultsContainer = document.getElementById('results-container');
+    let demandChart = null;
+    
+    predictionForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const productId = document.getElementById('product-select').value;
+        const storeId = document.getElementById('store-select').value;
+        const days = document.getElementById('days-select').value;
+        
+        if (!productId || !storeId) {
+            alert('Please select both a product and a store.');
+            return;
+        }
+        
+        // Show loading state
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+        submitBtn.disabled = true;
+        
+        // Make API request
+        fetch('/api/predict', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                product_id: productId,
+                store_id: storeId,
+                days: parseInt(days)
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Reset button
+            submitBtn.innerHTML = originalBtnText;
+            submitBtn.disabled = false;
+            
+            if (data.success) {
+                // Display results
+                displayResults(data, productId, storeId);
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error occurred'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            submitBtn.innerHTML = originalBtnText;
+            submitBtn.disabled = false;
+            alert('Error making request. See console for details.');
+        });
+    });
+    
+    function displayResults(data, productId, storeId) {
+        // Show results container
+        resultsContainer.classList.remove('d-none');
+        
+        // Set badges
+        const productSelect = document.getElementById('product-select');
+        const storeSelect = document.getElementById('store-select');
+        document.getElementById('product-badge').textContent = productSelect.options[productSelect.selectedIndex].text;
+        document.getElementById('store-badge').textContent = storeSelect.options[storeSelect.selectedIndex].text;
+        
+        // Display demand chart
+        displayDemandChart(data.predictions);
+        
+        // Display inventory recommendation
+        displayInventoryRecommendation(data.inventory_recommendation);
+        
+        // Display pricing recommendation
+        displayPricingRecommendation(data.pricing_recommendation);
+        
+        // Scroll to results
+        resultsContainer.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    function displayDemandChart(predictions) {
+        const ctx = document.getElementById('demand-chart').getContext('2d');
+        
+        // Prepare data
+        const labels = predictions.map(p => p.date);
+        const values = predictions.map(p => p.value);
+        
+        // Destroy previous chart if it exists
+        if (demandChart) {
+            demandChart.destroy();
+        }
+        
+        // Create new chart
+        demandChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Predicted Demand',
+                    data: values,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Demand Forecast (Next ' + predictions.length + ' Days)'
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    legend: {
+                        position: 'top',
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Date'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Units'
+                        },
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+    
+    function displayInventoryRecommendation(data) {
+        const containerEl = document.getElementById('inventory-recommendation');
+        
+        if (data.error) {
+            containerEl.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            return;
+        }
+        
+        let statusClass = 'text-success';
+        let statusIcon = 'fa-check-circle';
+        
+        if (data.restock_needed) {
+            statusClass = 'text-danger';
+            statusIcon = 'fa-exclamation-triangle';
+        }
+        
+        const html = `
+            <div class="mb-3">
+                <div class="d-flex align-items-center mb-2">
+                    <i class="fas ${statusIcon} ${statusClass} me-2"></i>
+                    <h5 class="mb-0 ${statusClass}">${data.restock_needed ? 'Restock Required' : 'Inventory Optimal'}</h5>
+                </div>
+                <p class="mb-1">Current stock: <strong>${data.current_stock}</strong> units</p>
+                <p class="mb-1">Days of supply: <strong>${data.days_of_supply}</strong> days</p>
+                <div class="progress mb-2">
+                    <div class="progress-bar ${data.days_of_supply < 15 ? 'bg-danger' : data.days_of_supply > 45 ? 'bg-warning' : 'bg-success'}" 
+                         role="progressbar" 
+                         style="width: ${Math.min(100, data.days_of_supply * 2)}%">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <h6>Recommendations:</h6>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item bg-dark">Reorder point: <strong>${data.reorder_point}</strong> units</li>
+                    <li class="list-group-item bg-dark">
+                        Recommended order: <strong>${data.restock_quantity}</strong> units
+                        ${data.restock_needed ? '<span class="badge bg-danger ms-2">Order Now</span>' : ''}
+                    </li>
+                    <li class="list-group-item bg-dark">Safety stock: <strong>${data.safety_stock}</strong> units</li>
+                    <li class="list-group-item bg-dark">Daily average demand: <strong>${data.daily_avg_demand}</strong> units</li>
+                </ul>
+            </div>
+        `;
+        
+        containerEl.innerHTML = html;
+    }
+    
+    function displayPricingRecommendation(data) {
+        const containerEl = document.getElementById('pricing-recommendation');
+        
+        if (data.error) {
+            containerEl.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            return;
+        }
+        
+        let priceChangeClass = 'text-warning';
+        let priceChangeIcon = 'fa-equals';
+        let priceChangeText = 'Maintain Current Price';
+        
+        if (data.price_adjustment_pct > 0) {
+            priceChangeClass = 'text-success';
+            priceChangeIcon = 'fa-arrow-up';
+            priceChangeText = 'Increase Price';
+        } else if (data.price_adjustment_pct < 0) {
+            priceChangeClass = 'text-danger';
+            priceChangeIcon = 'fa-arrow-down';
+            priceChangeText = 'Decrease Price';
+        }
+        
+        const html = `
+            <div class="mb-3">
+                <div class="d-flex align-items-center mb-2">
+                    <i class="fas ${priceChangeIcon} ${priceChangeClass} me-2"></i>
+                    <h5 class="mb-0 ${priceChangeClass}">${priceChangeText}</h5>
+                </div>
+                <p class="mb-1">Inventory status: <strong>${data.inventory_status.charAt(0).toUpperCase() + data.inventory_status.slice(1)}</strong></p>
+                <p class="mb-1">Current base price: <strong>$${data.base_price.toFixed(2)}</strong></p>
+            </div>
+            
+            <div class="card bg-dark border-${data.price_adjustment_pct > 0 ? 'success' : data.price_adjustment_pct < 0 ? 'danger' : 'warning'} mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Recommended Price: <strong>$${data.recommended_price.toFixed(2)}</strong></h5>
+                    <p class="card-text mb-0">
+                        <span class="badge bg-${data.price_adjustment_pct > 0 ? 'success' : data.price_adjustment_pct < 0 ? 'danger' : 'warning'}">
+                            ${data.price_adjustment_pct > 0 ? '+' : ''}${data.price_adjustment_pct.toFixed(1)}%
+                        </span>
+                        adjustment from base price
+                    </p>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <h6>Expected Impact:</h6>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item bg-dark">
+                        Demand change: 
+                        <strong class="text-${data.expected_demand_change_pct > 0 ? 'success' : 'danger'}">
+                            ${data.expected_demand_change_pct > 0 ? '+' : ''}${data.expected_demand_change_pct.toFixed(1)}%
+                        </strong>
+                    </li>
+                    <li class="list-group-item bg-dark">Expected daily demand: <strong>${data.new_expected_daily_demand.toFixed(2)}</strong> units</li>
+                    <li class="list-group-item bg-dark">Original daily demand: <strong>${data.original_daily_demand.toFixed(2)}</strong> units</li>
+                </ul>
+            </div>
+        `;
+        
+        containerEl.innerHTML = html;
+    }
+});
+</script>
+{% endblock %}

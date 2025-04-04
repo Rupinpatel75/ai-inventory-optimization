@@ -1,0 +1,61 @@
+Here’s a **full prompt** you can use for Replit to get started 🚀  
+
+---
+
+### 🔹 **Replit AI Hackathon Prompt: AI-Powered Inventory Optimization System**  
+
+#### ✅ **Project Goal**  
+We are building an **AI-powered inventory optimization system** that uses **multi-agent AI** to predict demand, optimize inventory, and suggest pricing strategies. The system will have:  
+
+1️⃣ A **backend API (Flask) on Replit** to connect AI agents  
+2️⃣ A **Prophet-based forecasting model** (trained in Colab, deployed on Replit)  
+3️⃣ A **web-based UI** (React or simple HTML/JS) to visualize AI decisions  
+4️⃣ A **multi-agent system** (Demand Agent, Inventory Agent, Pricing Agent)  
+
+---
+
+### 🔹 **Technologies We Will Use**  
+✅ **Google Colab** – For training the AI model and exporting as `.pkl`  
+✅ **Flask (Python)** – To create a backend API for AI agents  
+✅ **SQLite or Firebase** – To store inventory logs (optional)  
+✅ **React.js or HTML/CSS/JS** – To build a user-friendly UI  
+✅ **Replit** – To host and run everything seamlessly  
+
+---
+
+### 🔹 **Project Workflow**  
+
+1️⃣ **Train AI Model (Prophet in Google Colab)**  
+   - Train demand forecasting model  
+   - Export as `demand_model.pkl`  
+
+2️⃣ **Build Flask API (Replit Backend)**  
+   - Create `/predict` endpoint to return demand forecasts  
+   - Create `/logs` endpoint to track AI agent decisions  
+
+3️⃣ **Build Web Interface (Replit Frontend)**  
+   - User selects product/store/date  
+   - Fetch predictions from Flask API  
+   - Display real-time AI logs  
+
+4️⃣ **Connect AI Agents**  
+   - **Demand Agent**: Predicts future demand  
+   - **Inventory Agent**: Recommends restocking  
+   - **Pricing Agent**: Adjusts product prices  
+
+---
+
+### 🔹 **Final Deliverables**  
+✔️ **GitHub Repository** with Flask API + Frontend  
+✔️ **Demo Video** showing system in action  
+✔️ **Web App URL** hosted on Replit  
+✔️ **Google Drive Link** with presentation  
+
+---
+
+### 🔹 **How to Proceed?**  
+1️⃣ **Train Model in Colab** (I gave you the code earlier)  
+2️⃣ **Setup Replit Backend (Flask API)** – Want the Flask code now?  
+3️⃣ **Create Frontend UI** – Simple React/HTML+JS  
+
+👉 **Let me know if you want me to generate the Flask API code first!** 🚀

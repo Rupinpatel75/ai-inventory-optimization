@@ -1,0 +1,8 @@
+flask
+flask-sqlalchemy
+email-validator
+gunicorn
+numpy
+pandas
+psycopg2-binary
+sqlalchemy

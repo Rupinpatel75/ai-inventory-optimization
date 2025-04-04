@@ -1,412 +1,465 @@
 """
-Data loader for the AI Inventory Optimization System.
+Data loader utility for the AI Inventory Optimization System.
 
-This module handles loading CSV data files into the system for the three main data types:
-1. Demand forecasting data
-2. Inventory monitoring data 
-3. Pricing optimization data
-
-Each CSV file is mapped to the appropriate data structures and used by the respective
-optimization algorithms.
+This module provides functionality to load sample data for
+demonstration and testing purposes, as well as importing
+real data from external sources.
 """
 
-import os
-import csv
-import json
 import logging
-import pandas as pd
+import random
+import json
+import csv
+import os
 from datetime import datetime, timedelta
-from models import Product, Store, InventoryRecord, PredictionLog, AgentAction, db
-from typing import Dict, List, Any, Optional, Union
+import pandas as pd
+import numpy as np
+from models import Product, Store, InventoryRecord, PredictionLog, db
 
 logger = logging.getLogger(__name__)
 
-# Define paths to CSV files
-DATA_DIR = 'attached_assets'
-DEMAND_CSV = os.path.join(DATA_DIR, 'demand_forecasting.csv')
-INVENTORY_CSV = os.path.join(DATA_DIR, 'inventory_monitoring.csv')
-PRICING_CSV = os.path.join(DATA_DIR, 'pricing_optimization.csv')
-
 def load_sample_data():
     """
-    Load sample data from CSV files into the database.
+    Load sample data into the database.
     
     Returns:
-        bool: True if successful, False otherwise
+        Boolean indicating success
     """
     try:
-        # Load products and stores
-        load_product_store_data()
-        
-        # Load inventory records
-        load_inventory_records()
-        
-        logger.info("Sample data loaded successfully")
-        return True
-    except Exception as e:
-        logger.error(f"Error loading sample data: {str(e)}")
-        return False
-
-def load_product_store_data():
-    """
-    Load product and store data from CSV files.
-    
-    Returns:
-        bool: True if successful, False otherwise
-    """
-    try:
-        # Check if any products exist
-        if db.session.query(Product).first():
-            logger.info("Products already exist, skipping product load")
+        # Check if data already exists
+        if db.session.query(Product).count() > 0:
+            logger.info("Sample data already loaded")
             return True
         
-        # Sample product data
+        # Create sample products
         products = [
-            {"name": "Premium Coffee Beans", "category": "Beverages", "base_price": 14.99},
-            {"name": "Organic Whole Milk", "category": "Dairy", "base_price": 3.49},
-            {"name": "Artisan Bread", "category": "Bakery", "base_price": 4.99},
-            {"name": "Fresh Apples", "category": "Produce", "base_price": 1.99},
-            {"name": "Grass-Fed Ground Beef", "category": "Meat", "base_price": 8.99},
-            {"name": "Sparkling Water", "category": "Beverages", "base_price": 1.29},
-            {"name": "Organic Eggs", "category": "Dairy", "base_price": 5.49},
-            {"name": "Premium Potato Chips", "category": "Snacks", "base_price": 3.99},
-            {"name": "Gourmet Chocolate", "category": "Confectionery", "base_price": 7.99},
-            {"name": "Frozen Pizza", "category": "Frozen Foods", "base_price": 6.99}
+            {"name": "Basic T-Shirt", "category": "Clothing", "base_price": 19.99},
+            {"name": "Premium Denim Jeans", "category": "Clothing", "base_price": 49.99},
+            {"name": "Wireless Headphones", "category": "Electronics", "base_price": 79.99},
+            {"name": "Smart Fitness Tracker", "category": "Electronics", "base_price": 129.99},
+            {"name": "Organic Coffee Beans", "category": "Groceries", "base_price": 12.99},
+            {"name": "Protein Bars (Box of 12)", "category": "Groceries", "base_price": 15.99},
+            {"name": "Ergonomic Office Chair", "category": "Furniture", "base_price": 199.99},
+            {"name": "Wooden Coffee Table", "category": "Furniture", "base_price": 249.99},
+            {"name": "Professional Chef's Knife", "category": "Kitchen", "base_price": 89.99},
+            {"name": "Non-Stick Cookware Set", "category": "Kitchen", "base_price": 149.99}
         ]
         
-        # Sample store data
+        # Create sample stores
         stores = [
-            {"name": "Downtown Market", "location": "123 Main St, City Center"},
-            {"name": "Suburban Plaza", "location": "456 Oak Ave, Westview"},
-            {"name": "Neighborhood Express", "location": "789 Pine St, Eastside"},
-            {"name": "University Store", "location": "321 College Rd, Campus Area"},
-            {"name": "Beachfront Mart", "location": "654 Shore Dr, Oceanview"}
+            {"name": "Downtown Flagship", "location": "New York City"},
+            {"name": "Westfield Mall", "location": "Los Angeles"},
+            {"name": "Lakefront Center", "location": "Chicago"},
+            {"name": "Tech Hub Store", "location": "San Francisco"},
+            {"name": "Southern Outlet", "location": "Atlanta"}
         ]
         
         # Add products to database
-        for product_data in products:
-            product = Product(**product_data)
+        product_objs = []
+        for p in products:
+            product = Product(name=p["name"], category=p["category"], base_price=p["base_price"])
             db.session.add(product)
+            product_objs.append(product)
         
         # Add stores to database
-        for store_data in stores:
-            store = Store(**store_data)
+        store_objs = []
+        for s in stores:
+            store = Store(name=s["name"], location=s["location"])
             db.session.add(store)
+            store_objs.append(store)
         
         db.session.commit()
-        logger.info(f"Added {len(products)} products and {len(stores)} stores")
-        return True
-    
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error loading product and store data: {str(e)}")
-        return False
-
-def load_inventory_records():
-    """
-    Load inventory records from CSV files.
-    
-    Returns:
-        bool: True if successful, False otherwise
-    """
-    try:
-        # Check if any inventory records exist
-        if db.session.query(InventoryRecord).first():
-            logger.info("Inventory records already exist, skipping inventory record load")
-            return True
         
-        # Get all products and stores
-        products = db.session.query(Product).all()
-        stores = db.session.query(Store).all()
-        
-        # Generate initial inventory for each product at each store
-        for product in products:
-            for store in stores:
-                # Generate a random initial inventory between 10 and 100
-                import random
+        # Create inventory records with random quantities
+        for product in product_objs:
+            for store in store_objs:
                 quantity = random.randint(10, 100)
-                
-                record = InventoryRecord(
+                inventory = InventoryRecord(
                     product_id=product.id,
                     store_id=store.id,
                     quantity=quantity,
                     last_updated=datetime.now()
                 )
-                db.session.add(record)
+                db.session.add(inventory)
         
+        # Create some prediction logs
+        for product in product_objs[:5]:  # Only for some products
+            for store in store_objs[:3]:  # Only for some stores
+                avg_predicted = random.uniform(5, 30)
+                prediction = PredictionLog(
+                    product_id=product.id,
+                    store_id=store.id,
+                    prediction_days=30,
+                    avg_predicted_demand=avg_predicted,
+                    timestamp=datetime.now() - timedelta(days=random.randint(1, 7))
+                )
+                db.session.add(prediction)
+        
+        # Commit all changes
         db.session.commit()
-        logger.info(f"Added inventory records for {len(products)} products across {len(stores)} stores")
+        
+        logger.info(f"Loaded {len(products)} products, {len(stores)} stores")
+        logger.info(f"Created {len(products) * len(stores)} inventory records")
+        logger.info("Sample data loaded successfully")
+        
         return True
     
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Error loading inventory records: {str(e)}")
+        logger.error(f"Error loading sample data: {str(e)}")
         return False
 
-def load_demand_data():
+def import_csv_data(file_path, data_type):
     """
-    Load demand forecasting data from CSV file.
-    
-    Returns:
-        pandas.DataFrame: DataFrame with demand data, or None if error
-    """
-    try:
-        if not os.path.exists(DEMAND_CSV):
-            logger.warning(f"Demand data file not found: {DEMAND_CSV}")
-            return None
-        
-        df = pd.read_csv(DEMAND_CSV)
-        logger.info(f"Loaded demand data: {len(df)} rows")
-        return df
-    
-    except Exception as e:
-        logger.error(f"Error loading demand data: {str(e)}")
-        return None
-
-def load_inventory_data():
-    """
-    Load inventory monitoring data from CSV file.
-    
-    Returns:
-        pandas.DataFrame: DataFrame with inventory data, or None if error
-    """
-    try:
-        if not os.path.exists(INVENTORY_CSV):
-            logger.warning(f"Inventory data file not found: {INVENTORY_CSV}")
-            return None
-        
-        df = pd.read_csv(INVENTORY_CSV)
-        logger.info(f"Loaded inventory data: {len(df)} rows")
-        return df
-    
-    except Exception as e:
-        logger.error(f"Error loading inventory data: {str(e)}")
-        return None
-
-def load_pricing_data():
-    """
-    Load pricing optimization data from CSV file.
-    
-    Returns:
-        pandas.DataFrame: DataFrame with pricing data, or None if error
-    """
-    try:
-        if not os.path.exists(PRICING_CSV):
-            logger.warning(f"Pricing data file not found: {PRICING_CSV}")
-            return None
-        
-        df = pd.read_csv(PRICING_CSV)
-        logger.info(f"Loaded pricing data: {len(df)} rows")
-        return df
-    
-    except Exception as e:
-        logger.error(f"Error loading pricing data: {str(e)}")
-        return None
-
-def get_demand_metrics(product_id, store_id):
-    """
-    Get demand metrics for a specific product and store.
+    Import data from a CSV file.
     
     Args:
-        product_id: ID of the product
-        store_id: ID of the store
+        file_path: Path to the CSV file
+        data_type: Type of data ('products', 'stores', or 'inventory')
         
     Returns:
-        dict: Dictionary with demand metrics
+        Dictionary with import results
     """
     try:
-        # Load demand data
-        demand_df = load_demand_data()
-        if demand_df is None:
-            return None
+        if not os.path.exists(file_path):
+            return {"error": f"File not found: {file_path}"}
         
-        # Filter for the specific product and store
-        filtered_df = demand_df[(demand_df['product_id'] == product_id) & (demand_df['store_id'] == store_id)]
+        # Read CSV file
+        data = []
+        with open(file_path, 'r', encoding='utf-8') as f:
+            csv_reader = csv.DictReader(f)
+            for row in csv_reader:
+                data.append(row)
         
-        if filtered_df.empty:
-            logger.warning(f"No demand data found for product {product_id} at store {store_id}")
-            return None
+        if not data:
+            return {"error": "CSV file is empty or improperly formatted"}
         
-        # Extract metrics (adjust column names based on actual CSV structure)
-        metrics = {
-            "avg_daily_sales": filtered_df['avg_daily_sales'].values[0],
-            "sales_trend": filtered_df['sales_trend'].values[0],
-            "seasonality_factor": filtered_df['seasonality_factor'].values[0],
-            "promotion_effect": filtered_df['promotion_effect'].values[0],
-            "price_elasticity": filtered_df['price_elasticity'].values[0],
-            "competitor_impact": filtered_df['competitor_impact'].values[0]
-        }
-        
-        return metrics
+        # Process data based on type
+        if data_type == 'products':
+            return import_products(data)
+        elif data_type == 'stores':
+            return import_stores(data)
+        elif data_type == 'inventory':
+            return import_inventory(data)
+        else:
+            return {"error": f"Unknown data type: {data_type}"}
     
     except Exception as e:
-        logger.error(f"Error getting demand metrics: {str(e)}")
-        return None
+        logger.error(f"Error importing CSV data: {str(e)}")
+        return {"error": f"Failed to import CSV data: {str(e)}"}
 
-def get_inventory_metrics(product_id, store_id):
+def import_products(data):
     """
-    Get inventory metrics for a specific product and store.
+    Import product data.
     
     Args:
-        product_id: ID of the product
-        store_id: ID of the store
+        data: List of dictionaries with product data
         
     Returns:
-        dict: Dictionary with inventory metrics
+        Dictionary with import results
     """
     try:
-        # Load inventory data
-        inventory_df = load_inventory_data()
-        if inventory_df is None:
-            return None
+        products_added = 0
+        products_updated = 0
+        errors = []
         
-        # Filter for the specific product and store
-        filtered_df = inventory_df[(inventory_df['product_id'] == product_id) & (inventory_df['store_id'] == store_id)]
+        for item in data:
+            try:
+                # Check for required fields
+                if 'name' not in item or 'category' not in item or 'base_price' not in item:
+                    errors.append(f"Missing required fields for product: {item}")
+                    continue
+                
+                # Convert price to float
+                try:
+                    base_price = float(item['base_price'])
+                except ValueError:
+                    errors.append(f"Invalid base price for product: {item}")
+                    continue
+                
+                # Check if product already exists
+                existing = db.session.query(Product).filter_by(name=item['name']).first()
+                
+                if existing:
+                    # Update existing product
+                    existing.category = item['category']
+                    existing.base_price = base_price
+                    products_updated += 1
+                else:
+                    # Create new product
+                    product = Product(
+                        name=item['name'],
+                        category=item['category'],
+                        base_price=base_price
+                    )
+                    db.session.add(product)
+                    products_added += 1
+            
+            except Exception as e:
+                errors.append(f"Error processing product {item.get('name', 'unknown')}: {str(e)}")
         
-        if filtered_df.empty:
-            logger.warning(f"No inventory data found for product {product_id} at store {store_id}")
-            return None
+        # Commit all changes
+        db.session.commit()
         
-        # Extract metrics (adjust column names based on actual CSV structure)
-        metrics = {
-            "lead_time": filtered_df['lead_time'].values[0],
-            "holding_cost": filtered_df['holding_cost'].values[0],
-            "stockout_cost": filtered_df['stockout_cost'].values[0],
-            "reorder_point": filtered_df['reorder_point'].values[0],
-            "safety_stock": filtered_df['safety_stock'].values[0],
-            "min_order_qty": filtered_df['min_order_qty'].values[0]
+        return {
+            "products_added": products_added,
+            "products_updated": products_updated,
+            "errors": errors,
+            "success": True
         }
-        
-        return metrics
     
     except Exception as e:
-        logger.error(f"Error getting inventory metrics: {str(e)}")
-        return None
+        db.session.rollback()
+        logger.error(f"Error importing products: {str(e)}")
+        return {"error": f"Failed to import products: {str(e)}"}
 
-def get_pricing_metrics(product_id, store_id):
+def import_stores(data):
     """
-    Get pricing metrics for a specific product and store.
+    Import store data.
     
     Args:
-        product_id: ID of the product
-        store_id: ID of the store
+        data: List of dictionaries with store data
         
     Returns:
-        dict: Dictionary with pricing metrics
+        Dictionary with import results
     """
     try:
-        # Load pricing data
-        pricing_df = load_pricing_data()
-        if pricing_df is None:
-            return None
+        stores_added = 0
+        stores_updated = 0
+        errors = []
         
-        # Filter for the specific product and store
-        filtered_df = pricing_df[(pricing_df['product_id'] == product_id) & (pricing_df['store_id'] == store_id)]
+        for item in data:
+            try:
+                # Check for required fields
+                if 'name' not in item or 'location' not in item:
+                    errors.append(f"Missing required fields for store: {item}")
+                    continue
+                
+                # Check if store already exists
+                existing = db.session.query(Store).filter_by(name=item['name']).first()
+                
+                if existing:
+                    # Update existing store
+                    existing.location = item['location']
+                    stores_updated += 1
+                else:
+                    # Create new store
+                    store = Store(
+                        name=item['name'],
+                        location=item['location']
+                    )
+                    db.session.add(store)
+                    stores_added += 1
+            
+            except Exception as e:
+                errors.append(f"Error processing store {item.get('name', 'unknown')}: {str(e)}")
         
-        if filtered_df.empty:
-            logger.warning(f"No pricing data found for product {product_id} at store {store_id}")
-            return None
+        # Commit all changes
+        db.session.commit()
         
-        # Extract metrics (adjust column names based on actual CSV structure)
-        metrics = {
-            "min_price": filtered_df['min_price'].values[0],
-            "max_price": filtered_df['max_price'].values[0],
-            "competitor_price": filtered_df['competitor_price'].values[0],
-            "elasticity": filtered_df['elasticity'].values[0],
-            "margin_target": filtered_df['margin_target'].values[0],
-            "promotion_discount": filtered_df['promotion_discount'].values[0]
+        return {
+            "stores_added": stores_added,
+            "stores_updated": stores_updated,
+            "errors": errors,
+            "success": True
         }
-        
-        return metrics
     
     except Exception as e:
-        logger.error(f"Error getting pricing metrics: {str(e)}")
-        return None
+        db.session.rollback()
+        logger.error(f"Error importing stores: {str(e)}")
+        return {"error": f"Failed to import stores: {str(e)}"}
 
-def generate_historical_sales_data(product_id, store_id, days=90):
+def import_inventory(data):
     """
-    Generate historical sales data for a product at a store.
+    Import inventory data.
+    
+    Args:
+        data: List of dictionaries with inventory data
+        
+    Returns:
+        Dictionary with import results
+    """
+    try:
+        records_added = 0
+        records_updated = 0
+        errors = []
+        
+        for item in data:
+            try:
+                # Check for required fields
+                if 'product_id' not in item or 'store_id' not in item or 'quantity' not in item:
+                    errors.append(f"Missing required fields for inventory: {item}")
+                    continue
+                
+                # Convert IDs and quantity to integers
+                try:
+                    product_id = int(item['product_id'])
+                    store_id = int(item['store_id'])
+                    quantity = int(item['quantity'])
+                except ValueError:
+                    errors.append(f"Invalid numeric values for inventory: {item}")
+                    continue
+                
+                # Check if product and store exist
+                product = db.session.query(Product).filter_by(id=product_id).first()
+                store = db.session.query(Store).filter_by(id=store_id).first()
+                
+                if not product:
+                    errors.append(f"Product ID {product_id} not found")
+                    continue
+                
+                if not store:
+                    errors.append(f"Store ID {store_id} not found")
+                    continue
+                
+                # Check if inventory record already exists
+                existing = db.session.query(InventoryRecord).filter_by(
+                    product_id=product_id, store_id=store_id
+                ).first()
+                
+                if existing:
+                    # Update existing record
+                    existing.quantity = quantity
+                    existing.last_updated = datetime.now()
+                    records_updated += 1
+                else:
+                    # Create new inventory record
+                    record = InventoryRecord(
+                        product_id=product_id,
+                        store_id=store_id,
+                        quantity=quantity,
+                        last_updated=datetime.now()
+                    )
+                    db.session.add(record)
+                    records_added += 1
+            
+            except Exception as e:
+                errors.append(f"Error processing inventory record: {str(e)}")
+        
+        # Commit all changes
+        db.session.commit()
+        
+        return {
+            "records_added": records_added,
+            "records_updated": records_updated,
+            "errors": errors,
+            "success": True
+        }
+    
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error importing inventory: {str(e)}")
+        return {"error": f"Failed to import inventory: {str(e)}"}
+
+def generate_historical_sales_data(product_id, store_id, days=365, output_file=None):
+    """
+    Generate synthetic historical sales data for a product at a store.
     
     Args:
         product_id: ID of the product
         store_id: ID of the store
         days: Number of days of historical data to generate
+        output_file: Optional file path to save data as CSV
         
     Returns:
-        List of dictionaries with date and sales data
+        DataFrame with synthetic sales data
     """
     try:
-        # Get product and store
+        # Get product and store details
         product = db.session.query(Product).filter_by(id=product_id).first()
         store = db.session.query(Store).filter_by(id=store_id).first()
         
         if not product or not store:
-            logger.warning(f"Product {product_id} or Store {store_id} not found")
-            return []
+            logger.error(f"Product {product_id} or store {store_id} not found")
+            return None
         
-        # Get demand metrics or use defaults
-        metrics = get_demand_metrics(product_id, store_id)
-        if not metrics:
-            metrics = {
-                "avg_daily_sales": 20,
-                "sales_trend": 0.5,
-                "seasonality_factor": 1.0,
-                "promotion_effect": 0.2,
-                "price_elasticity": -1.5,
-                "competitor_impact": 0.1
-            }
+        # Set random seed for reproducibility
+        random.seed(product_id * 1000 + store_id)
         
-        # Generate historical data
+        # Generate base parameters
+        base_demand = random.uniform(10, 100)  # Base daily demand
+        trend = random.uniform(-0.0005, 0.001)  # Small daily trend
+        yearly_seasonality = random.uniform(0.1, 0.3)  # Yearly seasonal variation
+        weekly_seasonality = random.uniform(0.1, 0.3)  # Weekly seasonal variation
+        price_elasticity = random.uniform(-2.0, -0.5)  # Price elasticity
+        
+        # Generate date range
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=days)
+        date_range = [start_date + timedelta(days=i) for i in range(days)]
+        
+        # Generate data
         sales_data = []
-        today = datetime.now()
-        base_demand = metrics["avg_daily_sales"]
-        trend = metrics["sales_trend"]
-        seasonality_factor = metrics["seasonality_factor"]
         
-        import numpy as np
-        
-        for i in range(days, 0, -1):
-            day_offset = i
-            hist_date = today - timedelta(days=day_offset)
+        for i, date in enumerate(date_range):
+            # Calculate trend component
+            trend_component = base_demand * (1 + trend * i)
             
-            # Apply trend (percentage change per day)
-            trend_factor = 1.0 - (trend * day_offset / 100)  # Reverse trend for historical data
+            # Calculate yearly seasonality
+            day_of_year = date.timetuple().tm_yday
+            yearly_factor = 1 + yearly_seasonality * math.sin(day_of_year / 365 * 2 * math.pi)
             
-            # Apply day-of-week seasonality
-            day_of_week = hist_date.weekday()
-            day_factor = 1.2 if day_of_week >= 5 else 1.0  # Higher sales on weekends
+            # Calculate weekly seasonality
+            day_of_week = date.weekday()
+            if day_of_week >= 5:  # Weekend
+                weekly_factor = 1 + weekly_seasonality
+            else:
+                weekly_factor = 1 - (weekly_seasonality * 0.3)
             
-            # Apply month seasonality
-            month = hist_date.month
-            month_factor = 1.3 if month in [11, 12] else 1.0  # Higher sales in Nov, Dec
+            # Calculate price and promotion effects
+            base_price = product.base_price
             
-            # Apply random promotions
-            promo_factor = 1.0
-            if np.random.random() < 0.15:  # 15% chance of promotion on any day
-                promo_factor = 1.0 + metrics["promotion_effect"]
+            # Occasionally have a promotion
+            has_promotion = random.random() < 0.1  # 10% chance of promotion
+            discount_pct = random.uniform(0.1, 0.3) if has_promotion else 0
+            actual_price = base_price * (1 - discount_pct)
             
-            # Apply random noise
-            noise = np.random.normal(1.0, 0.1)  # Random factor with mean 1.0 and std 0.1
+            # Calculate price effect
+            if discount_pct > 0:
+                price_ratio = actual_price / base_price
+                price_effect = price_ratio ** price_elasticity
+            else:
+                price_effect = 1
             
-            # Calculate sales
-            sales = base_demand * trend_factor * day_factor * month_factor * seasonality_factor * promo_factor * noise
+            # Calculate final demand
+            demand = trend_component * yearly_factor * weekly_factor * price_effect
             
-            # Ensure sales is positive
-            sales = max(sales, 0)
+            # Add noise
+            noise = random.normalvariate(1, 0.2)
+            final_demand = max(0, demand * noise)
             
-            # Format date
-            date_str = hist_date.strftime("%Y-%m-%d")
+            # Round to whole units
+            units_sold = round(final_demand)
             
+            # Calculate sales amount
+            sales_amount = units_sold * actual_price
+            
+            # Add to data
             sales_data.append({
-                "date": date_str,
-                "sales": round(sales, 1),
-                "promotion": promo_factor > 1.0,
-                "day_of_week": day_of_week,
-                "month": month
+                'date': date.strftime('%Y-%m-%d'),
+                'product_id': product_id,
+                'product_name': product.name,
+                'store_id': store_id,
+                'store_name': store.name,
+                'units_sold': units_sold,
+                'price': round(actual_price, 2),
+                'base_price': round(base_price, 2),
+                'discount_pct': round(discount_pct * 100, 1),
+                'sales_amount': round(sales_amount, 2),
+                'day_of_week': day_of_week,
+                'has_promotion': has_promotion
             })
         
-        return sales_data
+        # Create DataFrame
+        df = pd.DataFrame(sales_data)
+        
+        # Save to CSV if output file specified
+        if output_file:
+            df.to_csv(output_file, index=False)
+            logger.info(f"Saved sales data to {output_file}")
+        
+        return df
     
     except Exception as e:
         logger.error(f"Error generating historical sales data: {str(e)}")
-        return []
+        return None

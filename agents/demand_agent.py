@@ -2,22 +2,22 @@
 Demand Agent module for the AI Inventory Optimization System.
 
 This module provides the demand forecasting agent that predicts
-future product demand based on historical data and market factors.
+future product demand based on historical data and external factors.
 """
 
 import logging
+import json
+from datetime import datetime, timedelta
 from agents.base_agent import BaseAgent
-from utils.forecasting import predict_demand, load_forecast_model
-from utils.data_loader import generate_historical_sales_data
-from models import PredictionLog, db
-from datetime import datetime
+from utils.forecasting import predict_demand, get_historical_sales, analyze_seasonality
+from models import Product, Store, PredictionLog, db
 
 logger = logging.getLogger(__name__)
 
 class DemandAgent(BaseAgent):
     """
     Demand forecasting agent that predicts future product demand
-    based on historical data and market factors.
+    based on historical sales data and external factors.
     """
     
     def __init__(self):
@@ -26,7 +26,7 @@ class DemandAgent(BaseAgent):
     
     def predict_product_demand(self, product_id, store_id, days=30):
         """
-        Predict demand for a product at a specific store for the given days.
+        Predict demand for a product at a store.
         
         Args:
             product_id: ID of the product
@@ -34,7 +34,7 @@ class DemandAgent(BaseAgent):
             days: Number of days to forecast
             
         Returns:
-            List of dictionaries with date and predicted demand
+            Dictionary with prediction details
         """
         try:
             # Get product and store to check if they exist
@@ -47,63 +47,69 @@ class DemandAgent(BaseAgent):
                     "error": f"Product {product_id} or store {store_id} not found"
                 }
             
-            # Generate demand predictions
-            predictions = predict_demand(product_id, store_id, days)
+            # Get demand prediction
+            prediction = predict_demand(product_id, store_id, days)
             
-            # Calculate average predicted demand
-            total_demand = sum(p.get('demand', 0) for p in predictions)
-            avg_demand = total_demand / days if days > 0 else 0
+            if "error" in prediction:
+                return prediction
             
-            # Log the prediction
-            self._log_prediction(product_id, store_id, days, avg_demand)
+            # Log the prediction to the database
+            prediction_log = PredictionLog(
+                product_id=product_id,
+                store_id=store_id,
+                prediction_days=days,
+                avg_predicted_demand=prediction["avg_daily_demand"],
+                timestamp=datetime.now()
+            )
+            
+            db.session.add(prediction_log)
+            db.session.commit()
             
             # Log the agent action
-            details = {
-                "days": days,
-                "avg_demand": round(avg_demand, 2),
-                "predictions": [
-                    {"date": p["date"], "demand": p["demand"]} 
-                    for p in predictions[:10]  # Include first 10 days in log
-                ] + (
-                    [{"...": "..."}] if len(predictions) > 10 else []
-                )
-            }
-            
             self.log_action(
                 action="Demand prediction",
                 product_id=product_id,
                 store_id=store_id,
-                details=details
+                details=prediction
             )
             
-            return {
+            # Add product and store names to the response
+            result = {
                 "product_id": product_id,
                 "product_name": product.name,
                 "store_id": store_id,
                 "store_name": store.name,
-                "days": days,
-                "avg_predicted_demand": round(avg_demand, 2),
-                "total_predicted_demand": round(total_demand, 2),
-                "predictions": predictions
+                **prediction
             }
+            
+            # Extract chart data for visualization
+            chart_data = {
+                "dates": [p["date"] for p in prediction["daily_predictions"]],
+                "values": [p["demand"] for p in prediction["daily_predictions"]]
+            }
+            
+            result["chart_data"] = chart_data
+            
+            return result
         
         except Exception as e:
-            logger.error(f"Error predicting demand: {str(e)}")
+            db.session.rollback()
+            logger.error(f"Error predicting product demand: {str(e)}")
             return {
-                "error": f"Failed to predict demand: {str(e)}"
+                "error": f"Failed to predict product demand: {str(e)}"
             }
     
     def get_historical_sales(self, product_id, store_id, days=90):
         """
-        Get historical sales data for a product at a specific store.
+        Get historical sales data for a product at a store.
         
         Args:
             product_id: ID of the product
             store_id: ID of the store
-            days: Number of days of historical data
+            days: Number of days of historical data to retrieve
             
         Returns:
-            List of dictionaries with date and sales data
+            Dictionary with historical sales data
         """
         try:
             # Get product and store to check if they exist
@@ -116,31 +122,42 @@ class DemandAgent(BaseAgent):
                     "error": f"Product {product_id} or store {store_id} not found"
                 }
             
-            # Generate historical sales data
-            sales_data = generate_historical_sales_data(product_id, store_id, days)
+            # Get historical sales data
+            historical = get_historical_sales(product_id, store_id, days)
+            
+            if "error" in historical:
+                return historical
             
             # Log the agent action
-            details = {
-                "days": days,
-                "data_points": len(sales_data),
-                "samples": sales_data[:5] if sales_data else []  # Include first 5 days in log
-            }
-            
             self.log_action(
-                action="Historical sales retrieval",
+                action="Historical sales data retrieval",
                 product_id=product_id,
                 store_id=store_id,
-                details=details
+                details={
+                    "days": days,
+                    "total_sales": historical.get("total_sales", 0),
+                    "avg_daily_sales": historical.get("avg_daily_sales", 0)
+                }
             )
             
-            return {
+            # Add product and store names to the response
+            result = {
                 "product_id": product_id,
                 "product_name": product.name,
                 "store_id": store_id,
                 "store_name": store.name,
-                "days": days,
-                "sales_data": sales_data
+                **historical
             }
+            
+            # Extract chart data for visualization
+            chart_data = {
+                "dates": [d["date"] for d in historical["daily_sales"]],
+                "values": [d["sales"] for d in historical["daily_sales"]]
+            }
+            
+            result["chart_data"] = chart_data
+            
+            return result
         
         except Exception as e:
             logger.error(f"Error getting historical sales: {str(e)}")
@@ -148,9 +165,9 @@ class DemandAgent(BaseAgent):
                 "error": f"Failed to get historical sales: {str(e)}"
             }
     
-    def analyze_seasonality(self, product_id, store_id, days=90):
+    def analyze_seasonality(self, product_id, store_id, days=365):
         """
-        Analyze seasonality patterns in historical sales data.
+        Analyze seasonality patterns for a product at a store.
         
         Args:
             product_id: ID of the product
@@ -161,167 +178,7 @@ class DemandAgent(BaseAgent):
             Dictionary with seasonality analysis
         """
         try:
-            # Get historical sales data
-            sales_response = self.get_historical_sales(product_id, store_id, days)
-            
-            if "error" in sales_response:
-                return sales_response
-            
-            sales_data = sales_response.get("sales_data", [])
-            
-            if not sales_data:
-                return {
-                    "error": "No historical sales data available for analysis"
-                }
-            
-            # Analyze by day of week
-            day_of_week_sales = {i: [] for i in range(7)}  # 0 = Monday, 6 = Sunday
-            
-            for data_point in sales_data:
-                day = data_point.get("day_of_week")
-                sales = data_point.get("sales")
-                if day is not None and sales is not None:
-                    day_of_week_sales[day].append(sales)
-            
-            # Calculate average sales by day of week
-            day_of_week_avg = {}
-            for day, sales in day_of_week_sales.items():
-                if sales:
-                    day_of_week_avg[day] = sum(sales) / len(sales)
-                else:
-                    day_of_week_avg[day] = 0
-            
-            # Calculate overall average
-            all_sales = [d.get("sales", 0) for d in sales_data]
-            overall_avg = sum(all_sales) / len(all_sales) if all_sales else 0
-            
-            # Calculate seasonality factors
-            dow_seasonality = {}
-            days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-            
-            for day, avg in day_of_week_avg.items():
-                if overall_avg > 0:
-                    factor = avg / overall_avg
-                else:
-                    factor = 1.0
-                
-                dow_seasonality[days_of_week[day]] = round(factor, 2)
-            
-            # Analyze by month
-            month_sales = {i: [] for i in range(1, 13)}  # 1 = January, 12 = December
-            
-            for data_point in sales_data:
-                month = data_point.get("month")
-                sales = data_point.get("sales")
-                if month and sales:
-                    month_sales[month].append(sales)
-            
-            # Calculate average sales by month
-            month_avg = {}
-            for month, sales in month_sales.items():
-                if sales:
-                    month_avg[month] = sum(sales) / len(sales)
-                else:
-                    month_avg[month] = 0
-            
-            # Calculate monthly seasonality factors
-            month_seasonality = {}
-            months = ["January", "February", "March", "April", "May", "June", 
-                     "July", "August", "September", "October", "November", "December"]
-            
-            for month, avg in month_avg.items():
-                if overall_avg > 0:
-                    factor = avg / overall_avg
-                else:
-                    factor = 1.0
-                
-                month_seasonality[months[month-1]] = round(factor, 2)
-            
-            # Log the agent action
-            details = {
-                "day_of_week_seasonality": dow_seasonality,
-                "month_seasonality": month_seasonality
-            }
-            
-            self.log_action(
-                action="Seasonality analysis",
-                product_id=product_id,
-                store_id=store_id,
-                details=details
-            )
-            
-            # Identify peak periods
-            peak_day = max(dow_seasonality.items(), key=lambda x: x[1])[0]
-            peak_month = max(month_seasonality.items(), key=lambda x: x[1])[0]
-            
-            # Identify low periods
-            low_day = min(dow_seasonality.items(), key=lambda x: x[1])[0]
-            low_month = min(month_seasonality.items(), key=lambda x: x[1])[0]
-            
-            return {
-                "product_id": product_id,
-                "product_name": sales_response.get("product_name"),
-                "store_id": store_id,
-                "store_name": sales_response.get("store_name"),
-                "overall_avg_daily_sales": round(overall_avg, 2),
-                "day_of_week_seasonality": dow_seasonality,
-                "month_seasonality": month_seasonality,
-                "peak_day": peak_day,
-                "peak_month": peak_month,
-                "low_day": low_day,
-                "low_month": low_month,
-                "samples_analyzed": len(sales_data)
-            }
-        
-        except Exception as e:
-            logger.error(f"Error analyzing seasonality: {str(e)}")
-            return {
-                "error": f"Failed to analyze seasonality: {str(e)}"
-            }
-    
-    def _log_prediction(self, product_id, store_id, days, avg_demand):
-        """
-        Log a demand prediction to the database.
-        
-        Args:
-            product_id: ID of the product
-            store_id: ID of the store
-            days: Number of days forecasted
-            avg_demand: Average predicted demand
-            
-        Returns:
-            None
-        """
-        try:
-            prediction_log = PredictionLog(
-                product_id=product_id,
-                store_id=store_id,
-                prediction_days=days,
-                avg_predicted_demand=avg_demand,
-                timestamp=datetime.now()
-            )
-            
-            db.session.add(prediction_log)
-            db.session.commit()
-        
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Error logging prediction: {str(e)}")
-    
-    def explain_forecast(self, product_id, store_id, days=30):
-        """
-        Generate a natural language explanation of the demand forecast.
-        
-        Args:
-            product_id: ID of the product
-            store_id: ID of the store
-            days: Number of days to forecast
-            
-        Returns:
-            Dictionary with forecast and explanation
-        """
-        try:
-            # Get product and store
+            # Get product and store to check if they exist
             product = self.get_product(product_id)
             store = self.get_store(store_id)
             
@@ -331,69 +188,236 @@ class DemandAgent(BaseAgent):
                     "error": f"Product {product_id} or store {store_id} not found"
                 }
             
-            # Get forecast
-            forecast_response = self.predict_product_demand(product_id, store_id, days)
+            # Analyze seasonality
+            seasonality = analyze_seasonality(product_id, store_id, days)
             
-            if "error" in forecast_response:
-                return forecast_response
+            if "error" in seasonality:
+                return seasonality
+            
+            # Log the agent action
+            self.log_action(
+                action="Seasonality analysis",
+                product_id=product_id,
+                store_id=store_id,
+                details={
+                    "peak_day": seasonality.get("peak_day", ""),
+                    "peak_month": seasonality.get("peak_month", ""),
+                    "seasonality_strength": seasonality.get("seasonality_strength", 0)
+                }
+            )
+            
+            # Add product and store names to the response
+            result = {
+                "product_id": product_id,
+                "product_name": product.name,
+                "store_id": store_id,
+                "store_name": store.name,
+                **seasonality
+            }
+            
+            # Extract chart data for weekly pattern visualization
+            weekly_chart_data = {
+                "labels": [wp["day_name"] for wp in seasonality["weekly_pattern"]],
+                "values": [wp["relative_to_avg"] for wp in seasonality["weekly_pattern"]]
+            }
+            
+            # Extract chart data for monthly pattern visualization
+            monthly_chart_data = {
+                "labels": [mp["month_name"] for mp in seasonality["monthly_pattern"]],
+                "values": [mp["relative_to_avg"] for mp in seasonality["monthly_pattern"]]
+            }
+            
+            result["weekly_chart_data"] = weekly_chart_data
+            result["monthly_chart_data"] = monthly_chart_data
+            
+            return result
+        
+        except Exception as e:
+            logger.error(f"Error analyzing seasonality: {str(e)}")
+            return {
+                "error": f"Failed to analyze seasonality: {str(e)}"
+            }
+    
+    def analyze_external_factors(self, product_id, store_id):
+        """
+        Analyze external factors affecting demand.
+        
+        Args:
+            product_id: ID of the product
+            store_id: ID of the store
+            
+        Returns:
+            Dictionary with external factors analysis
+        """
+        try:
+            # Get product and store to check if they exist
+            product = self.get_product(product_id)
+            store = self.get_store(store_id)
+            
+            if not product or not store:
+                logger.error(f"Product {product_id} or store {store_id} not found")
+                return {
+                    "error": f"Product {product_id} or store {store_id} not found"
+                }
+            
+            # In a real implementation, this would analyze weather data, economic indicators,
+            # competitor actions, etc.
+            # For now, we'll return a simplified analysis
+            
+            external_factors = {
+                "product_id": product_id,
+                "product_name": product.name,
+                "store_id": store_id,
+                "store_name": store.name,
+                "weather_impact": {
+                    "correlation": round(0.3 + (product_id * store_id % 10) / 20, 2),
+                    "significance": "medium",
+                    "description": "Moderate positive correlation with temperature for this product category."
+                },
+                "economic_indicators": {
+                    "correlation": round(0.2 + (product_id * store_id % 5) / 10, 2),
+                    "significance": "low",
+                    "description": "Some correlation with local employment rate changes."
+                },
+                "competitor_actions": {
+                    "significance": "high",
+                    "description": "Promotions by competitors show strong negative impact on sales."
+                },
+                "social_media": {
+                    "correlation": round(0.4 + (product_id * store_id % 7) / 20, 2),
+                    "significance": "medium",
+                    "description": "Social media sentiment shows moderate correlation with sales."
+                }
+            }
+            
+            # Generate natural language summary using LLM if available
+            prompt = f"""
+            Please provide a brief summary of the external factors affecting demand for {product.name} at {store.name}.
+            
+            Factors:
+            - Weather: {external_factors['weather_impact']['description']} (Correlation: {external_factors['weather_impact']['correlation']})
+            - Economic: {external_factors['economic_indicators']['description']} (Correlation: {external_factors['economic_indicators']['correlation']})
+            - Competitors: {external_factors['competitor_actions']['description']}
+            - Social Media: {external_factors['social_media']['description']} (Correlation: {external_factors['social_media']['correlation']})
+            
+            Based on the above, what are the 2-3 most significant external factors that should be monitored and incorporated into demand forecasting?
+            Provide a short paragraph (3-4 sentences).
+            """
+            
+            system_prompt = """
+            You are a helpful AI assistant specializing in retail analytics and demand forecasting.
+            Provide concise, actionable insights based on the data provided.
+            Focus on the most significant factors affecting demand.
+            """
+            
+            summary = self.analyze_with_llm(prompt, system_prompt)
+            
+            if summary:
+                external_factors["summary"] = summary
+            else:
+                # Fallback if LLM is not available
+                external_factors["summary"] = (
+                    f"For {product.name} at {store.name}, competitor promotions appear to have the strongest "
+                    f"impact on demand, showing a high significance. Social media sentiment and weather "
+                    f"patterns also show moderate correlations of {external_factors['social_media']['correlation']} and "
+                    f"{external_factors['weather_impact']['correlation']} respectively. It's recommended to closely "
+                    f"monitor competitor actions and develop strategies to mitigate their impact."
+                )
+            
+            # Log the agent action
+            self.log_action(
+                action="External factors analysis",
+                product_id=product_id,
+                store_id=store_id,
+                details=external_factors
+            )
+            
+            return external_factors
+        
+        except Exception as e:
+            logger.error(f"Error analyzing external factors: {str(e)}")
+            return {
+                "error": f"Failed to analyze external factors: {str(e)}"
+            }
+    
+    def explain_forecast(self, product_id, store_id, days=30):
+        """
+        Generate a natural language explanation of a demand forecast.
+        
+        Args:
+            product_id: ID of the product
+            store_id: ID of the store
+            days: Number of days of forecast to explain
+            
+        Returns:
+            Dictionary with forecast explanation
+        """
+        try:
+            # Get the forecast
+            forecast = self.predict_product_demand(product_id, store_id, days)
+            
+            if "error" in forecast:
+                return forecast
             
             # Get seasonality analysis
             seasonality = self.analyze_seasonality(product_id, store_id)
             
-            # Get forecast model parameters
-            model = load_forecast_model(product_id, store_id)
-            
             # Generate explanation using LLM if available
+            product = self.get_product(product_id)
+            store = self.get_store(store_id)
+            
+            # Prepare prompt with forecast data
             prompt = f"""
-            Please provide a brief explanation of the demand forecast for {product.name} at {store.name}.
+            Please explain the following demand forecast in clear, concise language for a store manager:
             
             Product: {product.name}
-            Category: {product.category}
             Store: {store.name}
-            Location: {store.location}
+            Forecast period: {days} days
+            Total forecasted demand: {forecast.get('total_demand', 0)} units
+            Average daily demand: {forecast.get('avg_daily_demand', 0)} units
+            Coefficient of variation: {forecast.get('coefficient_of_variation', 0)}
             
-            Forecast summary:
-            - Days forecasted: {days}
-            - Average daily demand: {forecast_response.get('avg_predicted_demand')} units
-            - Total demand over {days} days: {forecast_response.get('total_predicted_demand')} units
+            """
             
-            Model parameters:
-            - Base daily sales: {model.get('avg_daily_sales')} units
-            - Sales trend: {model.get('trend')}% per day
-            - Seasonality factor: {model.get('seasonality_factor')}
-            - Promotion effect: +{model.get('promotion_effect') * 100}%
-            - Price elasticity: {model.get('price_elasticity')}
+            if "error" not in seasonality:
+                prompt += f"""
+                Seasonality patterns:
+                - Peak day of week: {seasonality.get('peak_day', 'Unknown')}
+                - Lowest day of week: {seasonality.get('trough_day', 'Unknown')}
+                - Peak month: {seasonality.get('peak_month', 'Unknown')}
+                - Lowest month: {seasonality.get('trough_month', 'Unknown')}
+                - Seasonality strength: {seasonality.get('seasonality_strength', 0)}
+                """
             
-            Seasonality insights:
-            - Peak day: {seasonality.get('peak_day')}
-            - Peak month: {seasonality.get('peak_month')}
-            - Lowest day: {seasonality.get('low_day')}
-            - Lowest month: {seasonality.get('low_month')}
+            prompt += """
+            Please provide:
+            1. A 3-4 sentence summary of the forecast, highlighting the most important insights
+            2. 2-3 key actionable recommendations for the store manager based on this forecast
             
-            Please provide a 3-4 sentence explanation of this forecast in plain language.
+            Focus on practical implications for inventory management and staffing.
             """
             
             system_prompt = """
-            You are a helpful AI assistant explaining a demand forecast to a retail manager.
-            Your explanation should be clear, concise, and focused on actionable insights.
-            Highlight key trends, peaks, and any unusual patterns in the forecast.
+            You are a helpful AI assistant specializing in demand forecasting for retail.
+            Provide clear, concise explanations that non-technical retail managers can understand.
+            Focus on actionable insights and practical recommendations.
             """
             
             explanation = self.analyze_with_llm(prompt, system_prompt)
             
-            if not explanation or "error" in explanation.lower():
-                # Generate a basic explanation if LLM fails
-                explanation = f"Forecast for {product.name} at {store.name} projects an average daily demand of {forecast_response.get('avg_predicted_demand')} units, with a total of {forecast_response.get('total_predicted_demand')} units over the next {days} days. "
-                
-                if seasonality.get('peak_day') and seasonality.get('peak_month'):
-                    explanation += f"Sales are highest on {seasonality.get('peak_day')}s and during {seasonality.get('peak_month')}. "
-                
-                if model.get('trend', 0) > 0:
-                    explanation += f"Demand shows an increasing trend of approximately {model.get('trend')}% per day."
-                elif model.get('trend', 0) < 0:
-                    explanation += f"Demand shows a decreasing trend of approximately {abs(model.get('trend'))}% per day."
-                else:
-                    explanation += f"Demand is relatively stable with no significant trend."
+            if not explanation:
+                # Fallback if LLM is not available
+                explanation = (
+                    f"The forecast for {product.name} at {store.name} predicts a total demand of "
+                    f"{forecast.get('total_demand', 0)} units over the next {days} days, with an average "
+                    f"daily demand of {forecast.get('avg_daily_demand', 0)} units. "
+                    f"The demand shows {'high' if forecast.get('coefficient_of_variation', 0) > 0.5 else 'moderate' if forecast.get('coefficient_of_variation', 0) > 0.2 else 'low'} "
+                    f"variability (coefficient of variation: {forecast.get('coefficient_of_variation', 0)}).\n\n"
+                    f"Recommendations:\n"
+                    f"1. Maintain sufficient safety stock due to the {'high' if forecast.get('coefficient_of_variation', 0) > 0.5 else 'moderate' if forecast.get('coefficient_of_variation', 0) > 0.2 else 'low'} variability in demand.\n"
+                    f"2. Plan for higher staffing on {seasonality.get('peak_day', 'weekends')} when demand is expected to be highest.\n"
+                    f"3. Consider running promotions during {seasonality.get('trough_month', 'slower months')} to boost sales during typically slower periods."
+                )
             
             # Log the agent action
             self.log_action(
@@ -403,15 +427,21 @@ class DemandAgent(BaseAgent):
                 details={"explanation": explanation}
             )
             
-            return {
+            result = {
                 "product_id": product_id,
                 "product_name": product.name,
                 "store_id": store_id,
                 "store_name": store.name,
-                "forecast": forecast_response,
-                "explanation": explanation,
-                "seasonality": seasonality
+                "days": days,
+                "forecast_summary": {
+                    "total_demand": forecast.get('total_demand', 0),
+                    "avg_daily_demand": forecast.get('avg_daily_demand', 0),
+                    "coefficient_of_variation": forecast.get('coefficient_of_variation', 0)
+                },
+                "explanation": explanation
             }
+            
+            return result
         
         except Exception as e:
             logger.error(f"Error explaining forecast: {str(e)}")

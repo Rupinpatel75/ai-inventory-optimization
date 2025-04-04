@@ -33,3 +33,8 @@ numpy
 pandas
 requests
 trafilatura
+beautifulsoup4
+numpy
+pandas
+scikit-learn
+trafilatura

@@ -4,577 +4,297 @@
 
 {% block content %}
 <div class="row mb-4">
-    <div class="col-lg-12">
+    <div class="col-md-12">
         <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h4 class="mb-0">Agent Activity Logs</h4>
-                <div>
-                    <button id="refreshLogsButton" class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5>Filter Logs</h5>
-            </div>
             <div class="card-body">
-                <form id="logFilterForm">
-                    <div class="mb-3">
-                        <label for="agentTypeFilter" class="form-label">Agent Type</label>
-                        <select class="form-select" id="agentTypeFilter">
-                            <option value="">All Agents</option>
-                            <option value="demand">Demand Agent</option>
-                            <option value="inventory">Inventory Agent</option>
-                            <option value="pricing">Pricing Agent</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="actionTypeFilter" class="form-label">Action Type</label>
-                        <select class="form-select" id="actionTypeFilter">
-                            <option value="">All Actions</option>
-                            <option value="prediction">Predictions</option>
-                            <option value="recommendation">Recommendations</option>
-                            <option value="update">Updates</option>
-                            <option value="llm">LLM Interactions</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="productFilter" class="form-label">Product</label>
-                        <select class="form-select" id="productFilter">
-                            <option value="">All Products</option>
-                            {% for product in products %}
-                            <option value="{{ product.id }}">{{ product.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="storeFilter" class="form-label">Store</label>
-                        <select class="form-select" id="storeFilter">
-                            <option value="">All Stores</option>
-                            {% for store in stores %}
-                            <option value="{{ store.id }}">{{ store.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="timeRangeFilter" class="form-label">Time Range</label>
-                        <select class="form-select" id="timeRangeFilter">
-                            <option value="day">Last 24 Hours</option>
-                            <option value="week" selected>Last 7 Days</option>
-                            <option value="month">Last 30 Days</option>
-                            <option value="all">All Time</option>
-                        </select>
-                    </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Apply Filters</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-header">
-                <h5>Log Statistics</h5>
-            </div>
-            <div class="card-body">
-                <canvas id="agentActivityChart"></canvas>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-9">
-        <div class="card">
-            <div class="card-header">
-                <h5>Agent Logs</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Timestamp</th>
-                                <th>Agent</th>
-                                <th>Action</th>
-                                <th>Product</th>
-                                <th>Store</th>
-                                <th>Details</th>
-                            </tr>
-                        </thead>
-                        <tbody id="logsTable">
-                            <tr>
-                                <td colspan="6" class="text-center">Loading logs...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div class="d-flex justify-content-between align-items-center mt-3">
-                        <div>
-                            <select id="logsPerPage" class="form-select form-select-sm" style="width: auto;">
-                                <option value="10">10 per page</option>
-                                <option value="25" selected>25 per page</option>
-                                <option value="50">50 per page</option>
-                                <option value="100">100 per page</option>
-                            </select>
+                <h2 class="card-title">Agent Activity Logs</h2>
+                <p class="card-text">View a history of actions taken by the AI agents in the system.</p>
+                
+                <div class="row mt-4">
+                    <div class="col-md-12 mb-4">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">Agent Action Distribution</h5>
+                                <div>
+                                    <select id="chartTimeFrame" class="form-select form-select-sm">
+                                        <option value="7">Last 7 days</option>
+                                        <option value="30" selected>Last 30 days</option>
+                                        <option value="90">Last 90 days</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="agentActivityChart" width="400" height="200"></canvas>
+                            </div>
                         </div>
-                        <nav aria-label="Logs pagination">
-                            <ul class="pagination" id="logsPagination">
-                                <!-- Pagination will be inserted here -->
-                            </ul>
-                        </nav>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal for viewing log details -->
-<div class="modal fade" id="logDetailModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="logDetailModalTitle">Log Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" id="logDetailModalBody">
-                <!-- Content will be dynamically inserted -->
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+                
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">Detailed Logs</h5>
+                                <div class="d-flex">
+                                    <select id="agentTypeFilter" class="form-select form-select-sm me-2">
+                                        <option value="">All Agents</option>
+                                        <option value="demand">Demand Agent</option>
+                                        <option value="inventory">Inventory Agent</option>
+                                        <option value="pricing">Pricing Agent</option>
+                                    </select>
+                                    <select id="limitFilter" class="form-select form-select-sm">
+                                        <option value="20">20 entries</option>
+                                        <option value="50">50 entries</option>
+                                        <option value="100">100 entries</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Agent Type</th>
+                                                <th>Action</th>
+                                                <th>Product</th>
+                                                <th>Store</th>
+                                                <th>Details</th>
+                                                <th>Timestamp</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="logsTable">
+                                            <tr>
+                                                <td colspan="6" class="text-center">
+                                                    <div class="spinner-border" role="status">
+                                                        <span class="visually-hidden">Loading...</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block scripts %}
 <script>
-    // Data storage
-    let productsMap = {};
-    let storesMap = {};
-    let logEntries = [];
-    let filteredLogs = [];
-    let currentPage = 1;
-    let logsPerPage = 25;
-    let agentActivityChart = null;
+document.addEventListener('DOMContentLoaded', function() {
+    const agentTypeFilter = document.getElementById('agentTypeFilter');
+    const limitFilter = document.getElementById('limitFilter');
+    const chartTimeFrame = document.getElementById('chartTimeFrame');
+    let agentActivityChart;
     
-    // Initialize data and charts on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        // Fetch products and stores for lookup
-        Promise.all([
-            fetch('/api/products').then(response => response.json()),
-            fetch('/api/stores').then(response => response.json())
-        ])
-        .then(([productsResponse, storesResponse]) => {
-            if (productsResponse.success && storesResponse.success) {
-                // Create lookup maps
-                productsResponse.products.forEach(product => {
-                    productsMap[product.id] = product;
-                });
-                
-                storesResponse.stores.forEach(store => {
-                    storesMap[store.id] = store;
-                });
-                
-                // Load logs
-                loadLogs();
-            }
-        })
-        .catch(error => {
-            console.error('Error loading initial data:', error);
-        });
-        
-        // Set up event listeners
-        document.getElementById('refreshLogsButton').addEventListener('click', loadLogs);
-        document.getElementById('logFilterForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            applyFilters();
-        });
-        document.getElementById('logsPerPage').addEventListener('change', function() {
-            logsPerPage = parseInt(this.value);
-            currentPage = 1;
-            displayLogs();
-        });
-    });
+    // Initial logs load
+    loadLogs();
     
+    // Event listeners for filters
+    agentTypeFilter.addEventListener('change', loadLogs);
+    limitFilter.addEventListener('change', loadLogs);
+    chartTimeFrame.addEventListener('change', updateActivityChart);
+    
+    // Load logs based on filters
     function loadLogs() {
-        // Show loading state
-        document.getElementById('logsTable').innerHTML = '<tr><td colspan="6" class="text-center">Loading logs...</td></tr>';
+        const agentType = agentTypeFilter.value;
+        const limit = limitFilter.value;
+        const logsTable = document.getElementById('logsTable');
         
-        // Load logs data
-        fetch('/api/logs')
+        // Show loading
+        logsTable.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </td>
+            </tr>
+        `;
+        
+        // Build query params
+        let params = new URLSearchParams();
+        if (agentType) params.append('agent_type', agentType);
+        params.append('limit', limit);
+        
+        // Fetch logs
+        fetch(`/api/logs?${params.toString()}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    logEntries = data.logs;
+                    const logs = data.logs;
                     
-                    // Apply any current filters
-                    applyFilters();
+                    // Update table
+                    if (logs.length === 0) {
+                        logsTable.innerHTML = `
+                            <tr>
+                                <td colspan="6" class="text-center">No logs found</td>
+                            </tr>
+                        `;
+                    } else {
+                        let tableHTML = '';
+                        logs.forEach(log => {
+                            // Parse details if it's a JSON string
+                            let details = log.details || '';
+                            try {
+                                if (details) {
+                                    const parsedDetails = JSON.parse(details);
+                                    details = Object.entries(parsedDetails)
+                                        .map(([key, value]) => `<strong>${key}:</strong> ${value}`)
+                                        .join('<br>');
+                                }
+                            } catch (e) {
+                                // If not valid JSON, use as-is
+                            }
+                            
+                            // Format log entry
+                            tableHTML += `
+                                <tr>
+                                    <td>
+                                        <span class="badge rounded-pill bg-${getAgentColor(log.agent_type)}">
+                                            ${capitalize(log.agent_type)}
+                                        </span>
+                                    </td>
+                                    <td>${log.action}</td>
+                                    <td>${log.product_name || 'N/A'}</td>
+                                    <td>${log.store_name || 'N/A'}</td>
+                                    <td>${details}</td>
+                                    <td>${new Date(log.timestamp).toLocaleString()}</td>
+                                </tr>
+                            `;
+                        });
+                        logsTable.innerHTML = tableHTML;
+                    }
                     
-                    // Update statistics chart
-                    updateLogStatistics();
+                    // Get all logs for chart
+                    updateActivityChart();
                 } else {
-                    document.getElementById('logsTable').innerHTML = 
-                        '<tr><td colspan="6" class="text-center">Failed to load logs</td></tr>';
+                    console.error('Error fetching logs');
+                    logsTable.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="text-center text-danger">Error loading logs</td>
+                        </tr>
+                    `;
                 }
             })
             .catch(error => {
-                console.error('Error loading logs:', error);
-                document.getElementById('logsTable').innerHTML = 
-                    '<tr><td colspan="6" class="text-center">Error loading logs</td></tr>';
+                console.error('Error:', error);
+                logsTable.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center text-danger">Error connecting to the server</td>
+                    </tr>
+                `;
             });
     }
     
-    function applyFilters() {
-        const agentTypeFilter = document.getElementById('agentTypeFilter').value;
-        const actionTypeFilter = document.getElementById('actionTypeFilter').value;
-        const productFilter = document.getElementById('productFilter').value;
-        const storeFilter = document.getElementById('storeFilter').value;
-        const timeRangeFilter = document.getElementById('timeRangeFilter').value;
+    // Update activity chart
+    function updateActivityChart() {
+        // Get days for time frame
+        const days = parseInt(chartTimeFrame.value);
         
-        // Apply filters
-        filteredLogs = logEntries.filter(log => {
-            // Agent type filter
-            if (agentTypeFilter && log.agent_type !== agentTypeFilter) {
-                return false;
-            }
-            
-            // Action type filter
-            if (actionTypeFilter) {
-                const action = log.action.toLowerCase();
-                if (actionTypeFilter === 'prediction' && !action.includes('predict')) {
-                    return false;
-                } else if (actionTypeFilter === 'recommendation' && !action.includes('recommend')) {
-                    return false;
-                } else if (actionTypeFilter === 'update' && !action.includes('update')) {
-                    return false;
-                } else if (actionTypeFilter === 'llm' && !action.includes('llm')) {
-                    return false;
-                }
-            }
-            
-            // Product filter
-            if (productFilter && log.product_id != productFilter) {
-                return false;
-            }
-            
-            // Store filter
-            if (storeFilter && log.store_id != storeFilter) {
-                return false;
-            }
-            
-            // Time range filter
-            if (timeRangeFilter !== 'all') {
-                const logDate = new Date(log.timestamp);
-                const now = new Date();
-                
-                if (timeRangeFilter === 'day' && (now - logDate) > (24 * 60 * 60 * 1000)) {
-                    return false;
-                } else if (timeRangeFilter === 'week' && (now - logDate) > (7 * 24 * 60 * 60 * 1000)) {
-                    return false;
-                } else if (timeRangeFilter === 'month' && (now - logDate) > (30 * 24 * 60 * 60 * 1000)) {
-                    return false;
-                }
-            }
-            
-            return true;
-        });
-        
-        // Sort by timestamp, newest first
-        filteredLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        
-        // Reset to first page
-        currentPage = 1;
-        
-        // Display filtered logs
-        displayLogs();
-        
-        // Update statistics for filtered logs
-        updateLogStatistics();
-    }
-    
-    function displayLogs() {
-        const tableBody = document.getElementById('logsTable');
-        
-        if (filteredLogs.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No logs found</td></tr>';
-            document.getElementById('logsPagination').innerHTML = '';
-            return;
-        }
-        
-        // Calculate pagination
-        const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
-        const startIndex = (currentPage - 1) * logsPerPage;
-        const endIndex = Math.min(startIndex + logsPerPage, filteredLogs.length);
-        const pageEntries = filteredLogs.slice(startIndex, endIndex);
-        
-        // Generate table rows
-        let tableHtml = '';
-        
-        pageEntries.forEach((log, index) => {
-            const product = log.product_id ? (productsMap[log.product_id] || { name: 'Unknown' }) : { name: '—' };
-            const store = log.store_id ? (storesMap[log.store_id] || { name: 'Unknown' }) : { name: '—' };
-            
-            const logDate = new Date(log.timestamp);
-            const formattedDate = logDate.toLocaleString();
-            
-            tableHtml += `
-                <tr>
-                    <td>${formattedDate}</td>
-                    <td><span class="badge text-bg-${getAgentTypeBadgeClass(log.agent_type)}">${log.agent_type}</span></td>
-                    <td>${log.action}</td>
-                    <td>${product.name}</td>
-                    <td>${store.name}</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-info" 
-                                onclick="showLogDetails(${startIndex + index})">
-                            View
-                        </button>
-                    </td>
-                </tr>
-            `;
-        });
-        
-        tableBody.innerHTML = tableHtml;
-        
-        // Generate pagination controls
-        updatePagination(totalPages);
-    }
-    
-    function updatePagination(totalPages) {
-        const pagination = document.getElementById('logsPagination');
-        
-        if (totalPages <= 1) {
-            pagination.innerHTML = '';
-            return;
-        }
-        
-        let paginationHtml = '';
-        
-        // Previous button
-        paginationHtml += `
-            <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="changePage(${currentPage - 1}); return false;">Previous</a>
-            </li>
-        `;
-        
-        // Page numbers
-        const maxVisiblePages = 5;
-        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-        
-        if (endPage - startPage + 1 < maxVisiblePages) {
-            startPage = Math.max(1, endPage - maxVisiblePages + 1);
-        }
-        
-        if (startPage > 1) {
-            paginationHtml += `
-                <li class="page-item">
-                    <a class="page-link" href="#" onclick="changePage(1); return false;">1</a>
-                </li>
-            `;
-            
-            if (startPage > 2) {
-                paginationHtml += `
-                    <li class="page-item disabled">
-                        <span class="page-link">...</span>
-                    </li>
-                `;
-            }
-        }
-        
-        for (let i = startPage; i <= endPage; i++) {
-            paginationHtml += `
-                <li class="page-item ${i === currentPage ? 'active' : ''}">
-                    <a class="page-link" href="#" onclick="changePage(${i}); return false;">${i}</a>
-                </li>
-            `;
-        }
-        
-        if (endPage < totalPages) {
-            if (endPage < totalPages - 1) {
-                paginationHtml += `
-                    <li class="page-item disabled">
-                        <span class="page-link">...</span>
-                    </li>
-                `;
-            }
-            
-            paginationHtml += `
-                <li class="page-item">
-                    <a class="page-link" href="#" onclick="changePage(${totalPages}); return false;">${totalPages}</a>
-                </li>
-            `;
-        }
-        
-        // Next button
-        paginationHtml += `
-            <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="changePage(${currentPage + 1}); return false;">Next</a>
-            </li>
-        `;
-        
-        pagination.innerHTML = paginationHtml;
-    }
-    
-    function changePage(page) {
-        const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
-        
-        if (page < 1 || page > totalPages) {
-            return;
-        }
-        
-        currentPage = page;
-        displayLogs();
-    }
-    
-    function updateLogStatistics() {
-        // Count logs by agent type
-        const agentCounts = {
-            'demand': 0,
-            'inventory': 0,
-            'pricing': 0
-        };
-        
-        filteredLogs.forEach(log => {
-            if (agentCounts.hasOwnProperty(log.agent_type)) {
-                agentCounts[log.agent_type]++;
-            }
-        });
-        
-        // Create or update chart
-        const ctx = document.getElementById('agentActivityChart').getContext('2d');
-        
-        if (agentActivityChart) {
-            agentActivityChart.destroy();
-        }
-        
-        agentActivityChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: Object.keys(agentCounts).map(label => label.charAt(0).toUpperCase() + label.slice(1)),
-                datasets: [{
-                    label: 'Actions',
-                    data: Object.values(agentCounts),
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.5)',    // Demand - Red
-                        'rgba(54, 162, 235, 0.5)',    // Inventory - Blue
-                        'rgba(255, 206, 86, 0.5)'     // Pricing - Yellow
-                    ],
-                    borderColor: [
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(54, 162, 235, 1)',
-                        'rgba(255, 206, 86, 1)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            precision: 0
+        // Fetch all logs for charting
+        fetch(`/api/logs?limit=1000`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const logs = data.logs;
+                    
+                    // Process logs for chart
+                    const agentCounts = {
+                        'demand': 0,
+                        'inventory': 0,
+                        'pricing': 0
+                    };
+                    
+                    // Calculate cutoff date
+                    const cutoffDate = new Date();
+                    cutoffDate.setDate(cutoffDate.getDate() - days);
+                    
+                    // Count recent actions by agent type
+                    logs.forEach(log => {
+                        const logDate = new Date(log.timestamp);
+                        if (logDate >= cutoffDate) {
+                            agentCounts[log.agent_type] = (agentCounts[log.agent_type] || 0) + 1;
                         }
+                    });
+                    
+                    // Create or update chart
+                    const ctx = document.getElementById('agentActivityChart').getContext('2d');
+                    
+                    const chartData = {
+                        labels: ['Demand Agent', 'Inventory Agent', 'Pricing Agent'],
+                        datasets: [{
+                            label: 'Number of Actions',
+                            data: [
+                                agentCounts['demand'],
+                                agentCounts['inventory'],
+                                agentCounts['pricing']
+                            ],
+                            backgroundColor: [
+                                'rgba(54, 162, 235, 0.7)',
+                                'rgba(75, 192, 192, 0.7)',
+                                'rgba(255, 159, 64, 0.7)'
+                            ],
+                            borderColor: [
+                                'rgba(54, 162, 235, 1)',
+                                'rgba(75, 192, 192, 1)',
+                                'rgba(255, 159, 64, 1)'
+                            ],
+                            borderWidth: 1
+                        }]
+                    };
+                    
+                    // Destroy previous chart if exists
+                    if (agentActivityChart) {
+                        agentActivityChart.destroy();
                     }
+                    
+                    // Create new chart
+                    agentActivityChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: chartData,
+                        options: {
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'Number of Actions'
+                                    }
+                                }
+                            },
+                            plugins: {
+                                title: {
+                                    display: true,
+                                    text: `Agent Activity (Last ${days} Days)`
+                                }
+                            }
+                        }
+                    });
                 }
-            }
-        });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
     }
     
-    function showLogDetails(index) {
-        const log = filteredLogs[index];
-        
-        if (!log) {
-            return;
+    // Helper functions
+    function getAgentColor(agentType) {
+        switch (agentType) {
+            case 'demand': return 'primary';
+            case 'inventory': return 'success';
+            case 'pricing': return 'warning';
+            default: return 'secondary';
         }
-        
-        const logDate = new Date(log.timestamp);
-        const formattedDate = logDate.toLocaleString();
-        
-        const product = log.product_id ? (productsMap[log.product_id] || { name: 'Unknown' }) : null;
-        const store = log.store_id ? (storesMap[log.store_id] || { name: 'Unknown' }) : null;
-        
-        // Parse details if available
-        let details = {};
-        if (log.details) {
-            try {
-                details = JSON.parse(log.details);
-            } catch (e) {
-                details = { text: log.details };
-            }
-        }
-        
-        // Build modal content
-        const modalTitle = document.getElementById('logDetailModalTitle');
-        const modalBody = document.getElementById('logDetailModalBody');
-        
-        modalTitle.textContent = `${log.agent_type.charAt(0).toUpperCase() + log.agent_type.slice(1)} Agent: ${log.action}`;
-        
-        let content = `
-            <div class="card mb-3">
-                <div class="card-header">
-                    <h6 class="mb-0">Log Information</h6>
-                </div>
-                <div class="card-body">
-                    <p><strong>Timestamp:</strong> ${formattedDate}</p>
-                    <p><strong>Agent Type:</strong> <span class="badge text-bg-${getAgentTypeBadgeClass(log.agent_type)}">${log.agent_type}</span></p>
-                    <p><strong>Action:</strong> ${log.action}</p>
-                    ${product ? `<p><strong>Product:</strong> ${product.name}</p>` : ''}
-                    ${store ? `<p><strong>Store:</strong> ${store.name}</p>` : ''}
-                </div>
-            </div>
-        `;
-        
-        // Add details if available
-        if (Object.keys(details).length > 0) {
-            content += `
-                <div class="card">
-                    <div class="card-header">
-                        <h6 class="mb-0">Action Details</h6>
-                    </div>
-                    <div class="card-body">
-                        <pre class="log-details">${JSON.stringify(details, null, 2)}</pre>
-                    </div>
-                </div>
-            `;
-        }
-        
-        modalBody.innerHTML = content;
-        
-        // Show modal
-        const modal = new bootstrap.Modal(document.getElementById('logDetailModal'));
-        modal.show();
     }
     
-    // Helper function for agent type badge colors
-    function getAgentTypeBadgeClass(agentType) {
-        agentType = agentType.toLowerCase();
-        if (agentType === 'demand') return 'danger';
-        if (agentType === 'inventory') return 'primary';
-        if (agentType === 'pricing') return 'warning';
-        return 'secondary';
+    function capitalize(string) {
+        return string.charAt(0).toUpperCase() + string.slice(1);
     }
+});
 </script>
-{% endblock %}
-
-{% block extra_css %}
-<style>
-    .log-details {
-        max-height: 400px;
-        overflow-y: auto;
-        background-color: var(--bs-dark);
-        color: var(--bs-light);
-        padding: 1rem;
-        border-radius: 0.25rem;
-    }
-</style>
 {% endblock %}

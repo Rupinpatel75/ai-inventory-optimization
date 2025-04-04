@@ -4,103 +4,40 @@
 
 {% block content %}
 <div class="row mb-4">
-    <div class="col-lg-12">
-        <div class="card bg-primary text-white">
+    <div class="col-md-12">
+        <div class="card">
             <div class="card-body">
                 <h2 class="card-title">AI Inventory Optimization System</h2>
                 <p class="card-text">
-                    Welcome to the AI-powered inventory optimization platform. This system uses advanced multi-agent architecture to deliver intelligent demand forecasting, dynamic inventory management, and data-driven pricing strategies.
+                    Welcome to the AI Inventory Optimization System, powered by a multi-agent
+                    architecture designed to optimize your inventory management processes.
                 </p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h4 class="card-title">Demand Forecasting</h4>
-                <p class="card-text">
-                    Predict future product demand with our AI agent that analyzes historical data, seasonality, and market trends.
-                </p>
-                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#demandModal">
-                    Generate Predictions
-                </button>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h4 class="card-title">Inventory Optimization</h4>
-                <p class="card-text">
-                    Optimize stock levels based on demand forecasts to minimize costs while meeting customer needs.
-                </p>
-                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#inventoryModal">
-                    View Recommendations
-                </button>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card h-100">
-            <div class="card-body">
-                <h4 class="card-title">Price Optimization</h4>
-                <p class="card-text">
-                    Set optimal pricing based on demand elasticity, inventory levels, and competitive analysis.
-                </p>
-                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#pricingModal">
-                    Optimize Pricing
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-lg-12">
-        <div class="card">
-            <div class="card-header">
-                <h4>LLM Intelligence Features</h4>
-            </div>
-            <div class="card-body">
+                <hr>
                 <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <h5>Web Content Analysis</h5>
-                            <p>Test our web scraper to analyze external content for market intelligence.</p>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="scraperUrl" placeholder="Enter URL to analyze">
-                                <button class="btn btn-outline-primary" id="scrapeButton" type="button">Analyze</button>
-                            </div>
-                            <div class="mt-2" id="scraperResult" style="display: none;">
-                                <div class="card">
-                                    <div class="card-body">
-                                        <h6 class="card-title">Analysis Result</h6>
-                                        <p class="card-text" id="scraperContent"></p>
-                                    </div>
-                                </div>
+                    <div class="col-md-4">
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title">Demand Forecasting</h5>
+                                <p class="card-text">Predict future product demand using AI-powered analytics.</p>
+                                <a href="/dashboard" class="btn btn-primary">View Forecasts</a>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <h5>AI Agent Test</h5>
-                            <p>Test the individual agent capabilities with our multi-agent system.</p>
-                            <select class="form-select mb-2" id="agentType">
-                                <option value="demand">Demand Agent</option>
-                                <option value="inventory">Inventory Agent</option>
-                                <option value="pricing">Pricing Agent</option>
-                            </select>
-                            <button class="btn btn-outline-primary" id="testAgentButton">Test Agent</button>
-                            <div class="mt-2" id="agentResult" style="display: none;">
-                                <div class="card">
-                                    <div class="card-body">
-                                        <h6 class="card-title">Agent Response</h6>
-                                        <pre class="card-text" id="agentResponse"></pre>
-                                    </div>
-                                </div>
+                    <div class="col-md-4">
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title">Inventory Optimization</h5>
+                                <p class="card-text">Get recommendations for optimal inventory levels.</p>
+                                <a href="/dashboard" class="btn btn-primary">View Recommendations</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title">Pricing Strategies</h5>
+                                <p class="card-text">Optimize pricing based on demand and market data.</p>
+                                <a href="/dashboard" class="btn btn-primary">View Prices</a>
                             </div>
                         </div>
                     </div>
@@ -110,56 +47,47 @@
     </div>
 </div>
 
-<!-- Modals -->
-<div class="modal fade" id="demandModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Generate Demand Predictions</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="demandForm">
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h3 class="card-title">Generate Predictions</h3>
+                <p class="card-text">Select a product and store to generate demand forecasts, inventory recommendations, and pricing strategies.</p>
+                
+                <form id="predictionForm" class="mt-3">
                     <div class="row mb-3">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label for="productSelect" class="form-label">Product</label>
                             <select class="form-select" id="productSelect" required>
-                                <option value="">Select Product</option>
+                                <option value="" selected disabled>Select Product</option>
                                 {% for product in products %}
-                                <option value="{{ product.id }}">{{ product.name }}</option>
+                                <option value="{{ product.id }}">{{ product.name }} ({{ product.category }})</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label for="storeSelect" class="form-label">Store</label>
                             <select class="form-select" id="storeSelect" required>
-                                <option value="">Select Store</option>
+                                <option value="" selected disabled>Select Store</option>
                                 {% for store in stores %}
-                                <option value="{{ store.id }}">{{ store.name }}</option>
+                                <option value="{{ store.id }}">{{ store.name }} ({{ store.location }})</option>
                                 {% endfor %}
                             </select>
                         </div>
+                        <div class="col-md-4">
+                            <label for="daysInput" class="form-label">Days to Forecast</label>
+                            <input type="number" class="form-control" id="daysInput" value="30" min="1" max="90" required>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="daysRange" class="form-label">Prediction Days: <span id="daysValue">30</span></label>
-                        <input type="range" class="form-range" id="daysRange" min="7" max="90" value="30">
-                    </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Generate Predictions</button>
-                    </div>
+                    <button type="submit" class="btn btn-primary">Generate Predictions</button>
                 </form>
-                <div class="mt-4" id="predictionsResult" style="display: none;">
-                    <h5>Predictions</h5>
-                    <div class="chart-container" style="position: relative; height: 300px;">
-                        <canvas id="predictionsChart"></canvas>
-                    </div>
-                    <div class="mt-3">
-                        <h5>Inventory Recommendation</h5>
-                        <div id="inventoryRecommendation"></div>
-                    </div>
-                    <div class="mt-3">
-                        <h5>Pricing Recommendation</h5>
-                        <div id="pricingRecommendation"></div>
+                
+                <div id="predictionResults" class="mt-4" style="display: none;">
+                    <div class="alert alert-info">
+                        <div class="spinner-border spinner-border-sm" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <span class="ms-2">Processing prediction... Please wait.</span>
                     </div>
                 </div>
             </div>
@@ -168,227 +96,145 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block scripts %}
 <script>
-    // Range slider update
-    document.getElementById('daysRange').addEventListener('input', function() {
-        document.getElementById('daysValue').textContent = this.value;
-    });
-
-    // Chart setup
-    let predictionChart = null;
-
-    // Form submission
-    document.getElementById('demandForm').addEventListener('submit', function(e) {
+document.addEventListener('DOMContentLoaded', function() {
+    const predictionForm = document.getElementById('predictionForm');
+    const predictionResults = document.getElementById('predictionResults');
+    
+    predictionForm.addEventListener('submit', function(e) {
         e.preventDefault();
         
+        // Show loading indicator
+        predictionResults.style.display = 'block';
+        
+        // Get form values
         const productId = document.getElementById('productSelect').value;
         const storeId = document.getElementById('storeSelect').value;
-        const days = document.getElementById('daysRange').value;
+        const days = document.getElementById('daysInput').value;
         
-        if (!productId || !storeId) {
-            alert('Please select both product and store');
-            return;
-        }
-        
-        // Show loading state
-        const submitButton = this.querySelector('button[type="submit"]');
-        const originalText = submitButton.innerHTML;
-        submitButton.disabled = true;
-        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
-        
-        // Make API call
+        // Make API request
         fetch('/api/predict', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                product_id: productId,
-                store_id: storeId,
+                product_id: parseInt(productId),
+                store_id: parseInt(storeId),
                 days: parseInt(days)
             }),
         })
         .then(response => response.json())
         .then(data => {
-            // Reset button
-            submitButton.disabled = false;
-            submitButton.innerHTML = originalText;
-            
+            // Process results and update UI
             if (data.success) {
-                // Show results
-                document.getElementById('predictionsResult').style.display = 'block';
+                // Format the results in a user-friendly way
+                let resultsHTML = `
+                    <h4 class="mt-4">Prediction Results</h4>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card border-info">
+                                <div class="card-header bg-info text-white">
+                                    <h5 class="card-title mb-0">Demand Forecast</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p>Average predicted daily demand: <strong>${(data.predictions.reduce((sum, p) => sum + p.demand, 0) / data.predictions.length).toFixed(2)}</strong></p>
+                                    <p>Forecast period: <strong>${days} days</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-success">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="card-title mb-0">Inventory Recommendation</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p>Status: <strong>${data.inventory_recommendation.status}</strong></p>
+                                    <p>Current quantity: <strong>${data.inventory_recommendation.current_quantity}</strong></p>
+                                    <p>Recommended order: <strong>${data.inventory_recommendation.recommended_order}</strong></p>
+                                    <p><em>${data.inventory_recommendation.reasoning}</em></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning text-dark">
+                                    <h5 class="card-title mb-0">Pricing Recommendation</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p>Strategy: <strong>${data.pricing_recommendation.strategy}</strong></p>
+                                    <p>Base price: <strong>$${data.pricing_recommendation.base_price.toFixed(2)}</strong></p>
+                                    <p>Recommended price: <strong>$${data.pricing_recommendation.recommended_price.toFixed(2)}</strong></p>
+                                    <p><em>${data.pricing_recommendation.explanation}</em></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h4 class="mt-4">Demand Forecast Chart</h4>
+                    <canvas id="demandChart" width="400" height="200"></canvas>
+                `;
                 
-                // Prepare chart data
+                predictionResults.innerHTML = resultsHTML;
+                
+                // Create chart
                 const dates = data.predictions.map(p => p.date);
                 const demands = data.predictions.map(p => p.demand);
                 
-                // Create chart
-                if (predictionChart) {
-                    predictionChart.destroy();
-                }
-                
-                const ctx = document.getElementById('predictionsChart').getContext('2d');
-                predictionChart = new Chart(ctx, {
+                new Chart(document.getElementById('demandChart'), {
                     type: 'line',
                     data: {
                         labels: dates,
                         datasets: [{
                             label: 'Predicted Demand',
                             data: demands,
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderWidth: 2,
                             tension: 0.1
                         }]
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: false,
                         scales: {
+                            x: {
+                                display: true,
+                                title: {
+                                    display: true,
+                                    text: 'Date'
+                                }
+                            },
                             y: {
+                                display: true,
+                                title: {
+                                    display: true,
+                                    text: 'Demand'
+                                },
                                 beginAtZero: true
                             }
                         }
                     }
                 });
                 
-                // Display inventory recommendation
-                const invRec = data.inventory_recommendation;
-                document.getElementById('inventoryRecommendation').innerHTML = `
-                    <div class="card">
-                        <div class="card-body">
-                            <p><strong>Status:</strong> <span class="badge text-bg-${getStatusBadgeClass(invRec.status)}">${invRec.status}</span></p>
-                            <p><strong>Current Inventory:</strong> ${invRec.current_quantity} units</p>
-                            <p><strong>Recommended Order:</strong> ${invRec.recommended_order} units</p>
-                            <p><strong>Reasoning:</strong> ${invRec.reasoning}</p>
-                        </div>
+            } else {
+                // Show error
+                predictionResults.innerHTML = `
+                    <div class="alert alert-danger">
+                        Error generating predictions: ${data.error}
                     </div>
                 `;
-                
-                // Display pricing recommendation
-                const priceRec = data.pricing_recommendation;
-                document.getElementById('pricingRecommendation').innerHTML = `
-                    <div class="card">
-                        <div class="card-body">
-                            <p><strong>Strategy:</strong> <span class="badge text-bg-${getStrategyBadgeClass(priceRec.strategy)}">${priceRec.strategy}</span></p>
-                            <p><strong>Base Price:</strong> $${priceRec.base_price.toFixed(2)}</p>
-                            <p><strong>Recommended Price:</strong> $${priceRec.recommended_price.toFixed(2)}</p>
-                            <p><strong>Explanation:</strong> ${priceRec.explanation}</p>
-                        </div>
-                    </div>
-                `;
-            } else {
-                alert('Error: ' + (data.error || 'Unknown error'));
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            submitButton.disabled = false;
-            submitButton.innerHTML = originalText;
-            alert('An error occurred. Please try again.');
+            predictionResults.innerHTML = `
+                <div class="alert alert-danger">
+                    Error connecting to the server. Please try again.
+                </div>
+            `;
         });
     });
-
-    // Helper functions for badge colors
-    function getStatusBadgeClass(status) {
-        status = status.toUpperCase();
-        if (status === 'OUT_OF_STOCK') return 'danger';
-        if (status === 'LOW_STOCK') return 'warning';
-        if (status === 'ADEQUATE') return 'success';
-        if (status === 'OVERSTOCKED') return 'info';
-        return 'secondary';
-    }
-
-    function getStrategyBadgeClass(strategy) {
-        strategy = strategy.toUpperCase();
-        if (strategy === 'PREMIUM') return 'info';
-        if (strategy === 'STANDARD') return 'primary';
-        if (strategy === 'DISCOUNT') return 'warning';
-        if (strategy === 'CLEARANCE') return 'danger';
-        return 'secondary';
-    }
-
-    // Web scraper test
-    document.getElementById('scrapeButton').addEventListener('click', function() {
-        const url = document.getElementById('scraperUrl').value.trim();
-        if (!url) {
-            alert('Please enter a URL to analyze');
-            return;
-        }
-        
-        // Show loading state
-        this.disabled = true;
-        this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
-        
-        // Make API call
-        fetch('/api/web-scraper-test', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ url: url }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            // Reset button
-            this.disabled = false;
-            this.innerHTML = 'Analyze';
-            
-            if (data.success) {
-                // Show results
-                document.getElementById('scraperResult').style.display = 'block';
-                document.getElementById('scraperContent').textContent = data.content_preview;
-            } else {
-                alert('Error: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            this.disabled = false;
-            this.innerHTML = 'Analyze';
-            alert('An error occurred. Please try again.');
-        });
-    });
-
-    // Agent test
-    document.getElementById('testAgentButton').addEventListener('click', function() {
-        const agentType = document.getElementById('agentType').value;
-        
-        // Show loading state
-        this.disabled = true;
-        this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
-        
-        // Make API call
-        fetch(`/api/agent-test/${agentType}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-                product_id: 1,  // Using first product for simplicity
-                store_id: 1     // Using first store for simplicity
-            }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            // Reset button
-            this.disabled = false;
-            this.innerHTML = 'Test Agent';
-            
-            if (data.success) {
-                // Show results
-                document.getElementById('agentResult').style.display = 'block';
-                document.getElementById('agentResponse').textContent = JSON.stringify(data.result, null, 2);
-            } else {
-                alert('Error: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            this.disabled = false;
-            this.innerHTML = 'Test Agent';
-            alert('An error occurred. Please try again.');
-        });
-    });
+});
 </script>
 {% endblock %}

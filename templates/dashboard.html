@@ -4,533 +4,297 @@
 
 {% block content %}
 <div class="row mb-4">
-    <div class="col-lg-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h4 class="mb-0">Inventory Optimization Dashboard</h4>
-                <div>
-                    <button id="refreshButton" class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header">
-                <h5>Inventory Status Overview</h5>
-            </div>
-            <div class="card-body">
-                <canvas id="inventoryStatusChart"></canvas>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card h-100">
-            <div class="card-header">
-                <h5>Demand Forecast (Next 30 Days)</h5>
-            </div>
-            <div class="card-body">
-                <canvas id="demandForecastChart"></canvas>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-4">
     <div class="col-md-12">
         <div class="card">
-            <div class="card-header">
-                <h5>Inventory Alerts</h5>
-            </div>
             <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Product</th>
-                                <th>Store</th>
-                                <th>Status</th>
-                                <th>Current Quantity</th>
-                                <th>Recommended Order</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="inventoryAlertsTable">
-                            <tr>
-                                <td colspan="6" class="text-center">Loading inventory data...</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <h2 class="card-title">Dashboard</h2>
+                <p class="card-text">View and analyze inventory data across all stores and products.</p>
+                
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Inventory Status by Store</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="inventoryByStoreChart" width="400" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Inventory Value by Category</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="inventoryByCategoryChart" width="400" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                <h5>Pricing Recommendations</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Product</th>
-                                <th>Store</th>
-                                <th>Base Price</th>
-                                <th>Recommended Price</th>
-                                <th>Strategy</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="pricingRecommendationsTable">
-                            <tr>
-                                <td colspan="6" class="text-center">Loading pricing data...</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                
+                <div class="row mt-4">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Inventory Report</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Product</th>
+                                                <th>Category</th>
+                                                <th>Store</th>
+                                                <th>Location</th>
+                                                <th>Quantity</th>
+                                                <th>Base Price ($)</th>
+                                                <th>Value ($)</th>
+                                                <th>Last Updated</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="inventoryTable">
+                                            <tr>
+                                                <td colspan="9" class="text-center">
+                                                    <div class="spinner-border" role="status">
+                                                        <span class="visually-hidden">Loading...</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal for viewing recommendation details -->
-<div class="modal fade" id="recommendationModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="recommendationModalTitle">Recommendation Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" id="recommendationModalBody">
-                <!-- Content will be dynamically inserted -->
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block scripts %}
 <script>
-    // Charts
-    let inventoryStatusChart = null;
-    let demandForecastChart = null;
-    
-    // Data storage
-    let productsMap = {};
-    let storesMap = {};
-    let inventoryData = [];
-    let inventoryRecommendations = [];
-    let pricingRecommendations = [];
-    
-    // Initialize data and charts on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        // Fetch products and stores for lookup
-        Promise.all([
-            fetch('/api/products').then(response => response.json()),
-            fetch('/api/stores').then(response => response.json())
-        ])
-        .then(([productsResponse, storesResponse]) => {
-            if (productsResponse.success && storesResponse.success) {
-                // Create lookup maps
-                productsResponse.products.forEach(product => {
-                    productsMap[product.id] = product;
-                });
+document.addEventListener('DOMContentLoaded', function() {
+    // Fetch inventory data
+    fetch('/api/inventory')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Process inventory data
+                const inventoryRecords = data.inventory;
                 
-                storesResponse.stores.forEach(store => {
-                    storesMap[store.id] = store;
-                });
+                // Create inventory table
+                createInventoryTable(inventoryRecords);
                 
-                // Load dashboard data
-                loadDashboardData();
+                // Create store chart
+                createStoreChart(inventoryRecords);
+                
+                // Create category chart
+                createCategoryChart(inventoryRecords);
+            } else {
+                console.error('Error fetching inventory data');
             }
         })
         .catch(error => {
-            console.error('Error loading initial data:', error);
+            console.error('Error:', error);
         });
-        
-        // Set up refresh button
-        document.getElementById('refreshButton').addEventListener('click', loadDashboardData);
-    });
     
-    function loadDashboardData() {
-        // Show loading state
-        document.getElementById('inventoryAlertsTable').innerHTML = '<tr><td colspan="6" class="text-center">Loading inventory data...</td></tr>';
-        document.getElementById('pricingRecommendationsTable').innerHTML = '<tr><td colspan="6" class="text-center">Loading pricing data...</td></tr>';
+    // Create inventory table
+    function createInventoryTable(records) {
+        const tableBody = document.getElementById('inventoryTable');
+        let tableHTML = '';
         
-        // Load inventory data
-        fetch('/api/inventory')
+        // Get products to access price information
+        fetch('/api/products')
             .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    inventoryData = data.inventory;
+            .then(productsData => {
+                if (productsData.success) {
+                    const products = productsData.products;
                     
-                    // Generate recommendations for all products
-                    const recommendationPromises = [];
-                    
-                    // Only process the first 5 items to avoid overloading the system
-                    const processItems = inventoryData.slice(0, 5);
-                    
-                    processItems.forEach(item => {
-                        recommendationPromises.push(
-                            fetch('/api/predict', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    product_id: item.product_id,
-                                    store_id: item.store_id,
-                                    days: 30
-                                })
-                            })
-                            .then(response => response.json())
-                        );
+                    // Build table rows
+                    records.forEach(record => {
+                        // Find product to get base price
+                        const product = products.find(p => p.id === record.product_id);
+                        const basePrice = product ? product.base_price : 0;
+                        const value = basePrice * record.quantity;
+                        
+                        // Determine status based on quantity
+                        let status, statusClass;
+                        if (record.quantity <= 10) {
+                            status = 'Low Stock';
+                            statusClass = 'text-danger';
+                        } else if (record.quantity <= 30) {
+                            status = 'Medium Stock';
+                            statusClass = 'text-warning';
+                        } else {
+                            status = 'Well Stocked';
+                            statusClass = 'text-success';
+                        }
+                        
+                        tableHTML += `
+                            <tr>
+                                <td>${record.product_name}</td>
+                                <td>${product ? product.category : 'N/A'}</td>
+                                <td>${record.store_name}</td>
+                                <td>${record.store_id}</td>
+                                <td>${record.quantity}</td>
+                                <td>${basePrice.toFixed(2)}</td>
+                                <td>${value.toFixed(2)}</td>
+                                <td>${new Date(record.last_updated).toLocaleDateString()}</td>
+                                <td class="${statusClass}">${status}</td>
+                            </tr>
+                        `;
                     });
                     
-                    Promise.all(recommendationPromises)
-                        .then(recommendations => {
-                            // Process successful recommendations
-                            const successfulRecommendations = recommendations.filter(rec => rec.success);
-                            
-                            // Extract inventory and pricing recommendations
-                            inventoryRecommendations = successfulRecommendations.map(rec => {
-                                return {
-                                    product_id: rec.inventory_recommendation.product_id,
-                                    store_id: rec.inventory_recommendation.store_id,
-                                    ...rec.inventory_recommendation
-                                };
-                            });
-                            
-                            pricingRecommendations = successfulRecommendations.map(rec => {
-                                return {
-                                    product_id: rec.pricing_recommendation.product_id,
-                                    store_id: rec.pricing_recommendation.store_id,
-                                    ...rec.pricing_recommendation
-                                };
-                            });
-                            
-                            // Update inventory alerts table
-                            updateInventoryAlertsTable();
-                            
-                            // Update pricing recommendations table
-                            updatePricingRecommendationsTable();
-                            
-                            // Update charts
-                            updateInventoryStatusChart();
-                            updateDemandForecastChart(successfulRecommendations);
-                        })
-                        .catch(error => {
-                            console.error('Error generating recommendations:', error);
-                        });
+                    tableBody.innerHTML = tableHTML;
                 }
             })
             .catch(error => {
-                console.error('Error loading inventory data:', error);
+                console.error('Error fetching products:', error);
             });
     }
     
-    function updateInventoryAlertsTable() {
-        const tableBody = document.getElementById('inventoryAlertsTable');
-        
-        if (inventoryRecommendations.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No inventory alerts available</td></tr>';
-            return;
-        }
-        
-        let tableHtml = '';
-        
-        inventoryRecommendations.forEach(rec => {
-            const product = productsMap[rec.product_id] || { name: 'Unknown' };
-            const store = storesMap[rec.store_id] || { name: 'Unknown' };
-            
-            tableHtml += `
-                <tr>
-                    <td>${product.name}</td>
-                    <td>${store.name}</td>
-                    <td><span class="badge text-bg-${getStatusBadgeClass(rec.status)}">${rec.status}</span></td>
-                    <td>${rec.current_quantity}</td>
-                    <td>${rec.recommended_order}</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-info" 
-                                onclick="showInventoryRecommendation(${rec.product_id}, ${rec.store_id})">
-                            Details
-                        </button>
-                    </td>
-                </tr>
-            `;
-        });
-        
-        tableBody.innerHTML = tableHtml;
-    }
-    
-    function updatePricingRecommendationsTable() {
-        const tableBody = document.getElementById('pricingRecommendationsTable');
-        
-        if (pricingRecommendations.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No pricing recommendations available</td></tr>';
-            return;
-        }
-        
-        let tableHtml = '';
-        
-        pricingRecommendations.forEach(rec => {
-            const product = productsMap[rec.product_id] || { name: 'Unknown' };
-            const store = storesMap[rec.store_id] || { name: 'Unknown' };
-            
-            tableHtml += `
-                <tr>
-                    <td>${product.name}</td>
-                    <td>${store.name}</td>
-                    <td>$${rec.base_price.toFixed(2)}</td>
-                    <td>$${rec.recommended_price.toFixed(2)}</td>
-                    <td><span class="badge text-bg-${getStrategyBadgeClass(rec.strategy)}">${rec.strategy}</span></td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-info" 
-                                onclick="showPricingRecommendation(${rec.product_id}, ${rec.store_id})">
-                            Details
-                        </button>
-                    </td>
-                </tr>
-            `;
-        });
-        
-        tableBody.innerHTML = tableHtml;
-    }
-    
-    function updateInventoryStatusChart() {
-        // Count inventory by status
-        const statusCounts = {
-            'OUT_OF_STOCK': 0,
-            'LOW_STOCK': 0,
-            'ADEQUATE': 0,
-            'OVERSTOCKED': 0
-        };
-        
-        inventoryRecommendations.forEach(rec => {
-            if (statusCounts.hasOwnProperty(rec.status)) {
-                statusCounts[rec.status]++;
+    // Create store chart
+    function createStoreChart(records) {
+        // Group records by store
+        const storeData = {};
+        records.forEach(record => {
+            if (!storeData[record.store_name]) {
+                storeData[record.store_name] = 0;
             }
+            storeData[record.store_name] += record.quantity;
         });
         
-        // Create or update chart
-        const ctx = document.getElementById('inventoryStatusChart').getContext('2d');
+        // Extract labels and data
+        const labels = Object.keys(storeData);
+        const data = Object.values(storeData);
         
-        if (inventoryStatusChart) {
-            inventoryStatusChart.destroy();
-        }
-        
-        inventoryStatusChart = new Chart(ctx, {
-            type: 'doughnut',
+        // Create chart
+        new Chart(document.getElementById('inventoryByStoreChart'), {
+            type: 'bar',
             data: {
-                labels: Object.keys(statusCounts),
+                labels: labels,
                 datasets: [{
-                    data: Object.values(statusCounts),
+                    label: 'Total Items in Stock',
+                    data: data,
                     backgroundColor: [
-                        'rgba(220, 53, 69, 0.8)',   // OUT_OF_STOCK - Danger
-                        'rgba(255, 193, 7, 0.8)',   // LOW_STOCK - Warning
-                        'rgba(40, 167, 69, 0.8)',   // ADEQUATE - Success
-                        'rgba(23, 162, 184, 0.8)'   // OVERSTOCKED - Info
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(255, 205, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)'
+                    ],
+                    borderColor: [
+                        'rgba(54, 162, 235, 1)',
+                        'rgba(255, 99, 132, 1)',
+                        'rgba(255, 205, 86, 1)',
+                        'rgba(75, 192, 192, 1)',
+                        'rgba(153, 102, 255, 1)'
                     ],
                     borderWidth: 1
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom'
-                    }
-                }
-            }
-        });
-    }
-    
-    function updateDemandForecastChart(recommendations) {
-        // Use the first recommendation's predictions for the chart
-        if (recommendations.length === 0 || !recommendations[0].predictions) {
-            return;
-        }
-        
-        const predictions = recommendations[0].predictions;
-        const dates = predictions.map(p => p.date);
-        const demands = predictions.map(p => p.demand);
-        
-        // Create or update chart
-        const ctx = document.getElementById('demandForecastChart').getContext('2d');
-        
-        if (demandForecastChart) {
-            demandForecastChart.destroy();
-        }
-        
-        demandForecastChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: dates,
-                datasets: [{
-                    label: 'Predicted Demand',
-                    data: demands,
-                    borderColor: 'rgba(0, 123, 255, 1)',
-                    backgroundColor: 'rgba(0, 123, 255, 0.2)',
-                    borderWidth: 2,
-                    tension: 0.1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
                 scales: {
                     y: {
-                        beginAtZero: true
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Items in Stock'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Store'
+                        }
                     }
                 }
             }
         });
     }
     
-    function showInventoryRecommendation(productId, storeId) {
-        const recommendation = inventoryRecommendations.find(
-            rec => rec.product_id === productId && rec.store_id === storeId
-        );
-        
-        if (!recommendation) {
-            return;
-        }
-        
-        const product = productsMap[productId] || { name: 'Unknown' };
-        const store = storesMap[storeId] || { name: 'Unknown' };
-        
-        // Build modal content
-        const modalTitle = document.getElementById('recommendationModalTitle');
-        const modalBody = document.getElementById('recommendationModalBody');
-        
-        modalTitle.textContent = `Inventory Recommendation for ${product.name} at ${store.name}`;
-        
-        let content = `
-            <div class="card mb-3">
-                <div class="card-body">
-                    <h6>Status: <span class="badge text-bg-${getStatusBadgeClass(recommendation.status)}">${recommendation.status}</span></h6>
-                    <p><strong>Current Quantity:</strong> ${recommendation.current_quantity} units</p>
-                    <p><strong>Recommended Order:</strong> ${recommendation.recommended_order} units</p>
-                    <p><strong>Total Predicted Demand:</strong> ${recommendation.total_predicted_demand.toFixed(1)} units</p>
-                    <p><strong>Average Daily Demand:</strong> ${recommendation.average_daily_demand.toFixed(1)} units/day</p>
-                    <p><strong>Reasoning:</strong> ${recommendation.reasoning}</p>
-                </div>
-            </div>
-        `;
-        
-        // Add actions if available
-        if (recommendation.actions && recommendation.actions.length > 0) {
-            content += `
-                <h6>Recommended Actions:</h6>
-                <ul class="list-group mb-3">
-                    ${recommendation.actions.map(action => `<li class="list-group-item">${action}</li>`).join('')}
-                </ul>
-            `;
-        }
-        
-        // Add risks if available
-        if (recommendation.risks && recommendation.risks.length > 0) {
-            content += `
-                <h6>Risks:</h6>
-                <ul class="list-group">
-                    ${recommendation.risks.map(risk => `<li class="list-group-item">${risk}</li>`).join('')}
-                </ul>
-            `;
-        }
-        
-        modalBody.innerHTML = content;
-        
-        // Show modal
-        const modal = new bootstrap.Modal(document.getElementById('recommendationModal'));
-        modal.show();
+    // Create category chart
+    function createCategoryChart(records) {
+        // We need products data to get categories
+        fetch('/api/products')
+            .then(response => response.json())
+            .then(productsData => {
+                if (productsData.success) {
+                    const products = productsData.products;
+                    
+                    // Group by category and calculate value
+                    const categoryData = {};
+                    records.forEach(record => {
+                        const product = products.find(p => p.id === record.product_id);
+                        if (product) {
+                            const category = product.category;
+                            const value = product.base_price * record.quantity;
+                            
+                            if (!categoryData[category]) {
+                                categoryData[category] = 0;
+                            }
+                            categoryData[category] += value;
+                        }
+                    });
+                    
+                    // Extract labels and data
+                    const labels = Object.keys(categoryData);
+                    const data = Object.values(categoryData);
+                    
+                    // Create chart
+                    new Chart(document.getElementById('inventoryByCategoryChart'), {
+                        type: 'pie',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Inventory Value',
+                                data: data,
+                                backgroundColor: [
+                                    'rgba(255, 99, 132, 0.7)',
+                                    'rgba(54, 162, 235, 0.7)',
+                                    'rgba(255, 205, 86, 0.7)',
+                                    'rgba(75, 192, 192, 0.7)',
+                                    'rgba(153, 102, 255, 0.7)'
+                                ],
+                                borderColor: [
+                                    'rgba(255, 99, 132, 1)',
+                                    'rgba(54, 162, 235, 1)',
+                                    'rgba(255, 205, 86, 1)',
+                                    'rgba(75, 192, 192, 1)',
+                                    'rgba(153, 102, 255, 1)'
+                                ],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const label = context.label || '';
+                                            const value = context.raw;
+                                            return `${label}: $${value.toFixed(2)}`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching products:', error);
+            });
     }
-    
-    function showPricingRecommendation(productId, storeId) {
-        const recommendation = pricingRecommendations.find(
-            rec => rec.product_id === productId && rec.store_id === storeId
-        );
-        
-        if (!recommendation) {
-            return;
-        }
-        
-        const product = productsMap[productId] || { name: 'Unknown' };
-        const store = storesMap[storeId] || { name: 'Unknown' };
-        
-        // Build modal content
-        const modalTitle = document.getElementById('recommendationModalTitle');
-        const modalBody = document.getElementById('recommendationModalBody');
-        
-        modalTitle.textContent = `Pricing Recommendation for ${product.name} at ${store.name}`;
-        
-        let content = `
-            <div class="card mb-3">
-                <div class="card-body">
-                    <h6>Strategy: <span class="badge text-bg-${getStrategyBadgeClass(recommendation.strategy)}">${recommendation.strategy}</span></h6>
-                    <p><strong>Base Price:</strong> $${recommendation.base_price.toFixed(2)}</p>
-                    <p><strong>Recommended Price:</strong> $${recommendation.recommended_price.toFixed(2)}</p>
-                    <p><strong>Price Adjustment:</strong> ${Math.round((recommendation.price_adjustment - 1) * 100)}%</p>
-                    <p><strong>Explanation:</strong> ${recommendation.explanation}</p>
-                </div>
-            </div>
-        `;
-        
-        // Add actions if available
-        if (recommendation.actions && recommendation.actions.length > 0) {
-            content += `
-                <h6>Recommended Actions:</h6>
-                <ul class="list-group mb-3">
-                    ${recommendation.actions.map(action => `<li class="list-group-item">${action}</li>`).join('')}
-                </ul>
-            `;
-        }
-        
-        // Add expected impact if available
-        if (recommendation.expected_impact) {
-            content += `
-                <h6>Expected Impact:</h6>
-                <div class="alert alert-info">
-                    ${recommendation.expected_impact}
-                </div>
-            `;
-        }
-        
-        modalBody.innerHTML = content;
-        
-        // Show modal
-        const modal = new bootstrap.Modal(document.getElementById('recommendationModal'));
-        modal.show();
-    }
-    
-    // Helper functions for badge colors
-    function getStatusBadgeClass(status) {
-        status = status.toUpperCase();
-        if (status === 'OUT_OF_STOCK') return 'danger';
-        if (status === 'LOW_STOCK') return 'warning';
-        if (status === 'ADEQUATE') return 'success';
-        if (status === 'OVERSTOCKED') return 'info';
-        return 'secondary';
-    }
-
-    function getStrategyBadgeClass(strategy) {
-        strategy = strategy.toUpperCase();
-        if (strategy === 'PREMIUM') return 'info';
-        if (strategy === 'STANDARD') return 'primary';
-        if (strategy === 'DISCOUNT') return 'warning';
-        if (strategy === 'CLEARANCE') return 'danger';
-        return 'secondary';
-    }
+});
 </script>
 {% endblock %}

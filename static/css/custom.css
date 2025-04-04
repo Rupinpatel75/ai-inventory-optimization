@@ -1,40 +1,76 @@
-/* Main styles for AI Inventory Optimization System */
+/* Custom styles for the AI Inventory Optimization System */
 
-/* Dashboard specific styles */
-.card {
-    margin-bottom: 1.5rem;
+/* Dark-mode compatible styles */
+body {
+    padding-bottom: 70px;
 }
 
+.navbar-brand svg {
+    vertical-align: text-bottom;
+}
+
+.card {
+    margin-bottom: 20px;
+    border-radius: 8px;
+}
+
+.card-header {
+    border-radius: 8px 8px 0 0 !important;
+}
+
+.footer {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    z-index: 1000;
+}
+
+/* Dashboard styles */
+.dashboard-number {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.dashboard-label {
+    font-size: 0.9rem;
+    color: var(--bs-secondary);
+}
+
+/* Chart container */
 .chart-container {
     position: relative;
     height: 300px;
     width: 100%;
 }
 
-/* Custom badge colors for inventory status */
-.badge-out-of-stock {
+/* Status indicators */
+.status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.status-low {
     background-color: var(--bs-danger);
 }
 
-.badge-low-stock {
+.status-medium {
     background-color: var(--bs-warning);
 }
 
-.badge-adequate {
+.status-good {
     background-color: var(--bs-success);
 }
 
-.badge-overstocked {
-    background-color: var(--bs-info);
-}
-
-/* Agent type badge colors */
+/* Agent type badges */
 .badge-demand {
-    background-color: var(--bs-danger);
+    background-color: var(--bs-primary);
 }
 
 .badge-inventory {
-    background-color: var(--bs-primary);
+    background-color: var(--bs-success);
 }
 
 .badge-pricing {
@@ -42,86 +78,13 @@
     color: var(--bs-dark);
 }
 
-/* Custom alert styling */
-.alert-recommendation {
-    background-color: rgba(0, 123, 255, 0.1);
-    border-color: var(--bs-primary);
-    color: var(--bs-light);
-}
-
-/* Card hover effects */
-.card-hover {
-    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-}
-
-.card-hover:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-}
-
-/* Custom footer styling */
-.footer {
-    position: absolute;
-    bottom: 0;
-    width: 100%;
-    height: 60px;
-    line-height: 60px;
-}
-
-/* Make sure the body has enough padding for the footer */
-body {
-    min-height: 100vh;
-    position: relative;
-    padding-bottom: 70px;
-}
-
 /* Responsive adjustments */
 @media (max-width: 768px) {
-    .card-stats {
-        margin-bottom: 1rem;
+    .card-title {
+        font-size: 1.25rem;
     }
     
-    body {
-        padding-bottom: 120px;
+    .dashboard-number {
+        font-size: 1.5rem;
     }
-    
-    .footer {
-        height: 100px;
-    }
-}
-
-/* Modal customizations */
-.modal-header {
-    border-bottom: 1px solid var(--bs-gray-700);
-}
-
-.modal-footer {
-    border-top: 1px solid var(--bs-gray-700);
-}
-
-/* Table responsive improvements */
-.table-responsive {
-    min-height: 300px;
-}
-
-/* LLM status indicator */
-#llm-status .badge {
-    font-size: 0.8rem;
-    padding: 0.5em 0.75em;
-}
-
-/* Pre-formatted code in cards */
-pre.card-text {
-    background-color: var(--bs-dark);
-    padding: 1rem;
-    border-radius: 0.25rem;
-    color: var(--bs-light);
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-/* Recommendation details in modal */
-.recommendation-details {
-    max-height: 400px;
-    overflow-y: auto;
 }

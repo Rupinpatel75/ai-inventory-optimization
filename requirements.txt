@@ -38,3 +38,7 @@ numpy
 pandas
 scikit-learn
 trafilatura
+numpy
+pandas
+trafilatura
+trafilatura

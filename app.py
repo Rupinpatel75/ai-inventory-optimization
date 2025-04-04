@@ -21,7 +21,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key")
 
 # Configure SQLite database
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///inventory_system.db")
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///inventory_system.db"
+# SQLite doesn't need pool options but keeping them for future compatibility
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
